@@ -442,6 +442,10 @@ let currentStreetOpacity = 0.7;
 
 const API_BASE_URL = 'https://the-last-mile-cfpx.onrender.com';
 
+// Global cache for street GeoJSON (loaded once)
+window.fullGeoJSON = null;
+let isLoadingGeoJSON = false;
+
 async function loadAndShowFountains() {
     if (!fountainData || fountainData.length === 0) {
         updateStatus('Loading fountain data...');
@@ -500,7 +504,7 @@ function updateStatusItem(type, status, message) {
 
 async function checkServerConnection() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/test`, { 
+        const response = await fetch(`${API_BASE_URL}/api/data-status`, { 
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
@@ -516,150 +520,86 @@ async function checkServerConnection() {
 
 async function loadAllData() {
     try {
-        updateAllStatus('loading', 'Loading all data from server...');
+        updateAllStatus('loading', 'Connecting to server...');
         
-        // Show loading state in stats
-        document.getElementById('stats-loaded').textContent = 'Status: Loading...';
-        document.getElementById('stats-loaded').style.color = 'orange';
-        
-        // Try multiple server URLs
-        const serverUrls = [
-            'https://the-last-mile-cfpx.onrender.com/api/all-data',
-            'https://the-last-mile-cfpx.onrender.com/api/all-data'
-        ];
-        
-        let result = null;
-        let serverUsed = null;
-        let success = false;
-        
-        for (const url of serverUrls) {
-            try {
-                console.log(`Attempting to fetch from: ${url}`);
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                    },
-                    mode: 'cors'
-                });
-                
-                if (response.ok) {
-                    result = await response.json();
-                    serverUsed = url;
-                    success = true;
-                    console.log(`✅ Connected to server: ${url}`);
-                    break;
-                } else {
-                    console.warn(`Server ${url} responded with status: ${response.status}`);
-                }
-            } catch (error) {
-                console.log(`Cannot connect to ${url}:`, error.message);
-            }
+        // Check server connection first
+        const isConnected = await checkServerConnection();
+        if (!isConnected) {
+            updateAllStatus('error', '❌ Cannot connect to server');
+            return;
         }
         
-        if (!success || !result) {
-            throw new Error('Cannot connect to server. Make sure server.py is running on port 5000.');
-        }
+        updateAllStatus('loading', 'Loading all data...');
         
-        if (!result.success) {
-            throw new Error(`Server error: ${result.error || 'Unknown error'}`);
-        }
-        console.log('📞 Calling processMetroDataFromServer...');
-        console.log('Data to pass:', result.metro.data ? result.metro.data.length : 'no data');
-        processMetroDataFromServer(result.metro.data);
-        console.log('📞 processMetroDataFromServer called (check console for errors)');
-        
-        console.log('Server response received from:', serverUsed);
-        console.log('Result structure:', {
-            metro: result.metro ? `Loaded: ${result.metro.loaded}, Count: ${result.metro.count}` : 'No metro data',
-            fountains: result.fountains ? `Loaded: ${result.fountains.loaded}, Count: ${result.fountains.count}` : 'No fountain data',
-            benches: result.benches ? `Loaded: ${result.benches.loaded}, Count: ${result.benches.count}` : 'No bench data'
+        // Fetch all CSV data in one call
+        const response = await fetch(`${API_BASE_URL}/api/all-data`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            mode: 'cors'
         });
-
-        console.log('✅ Server response received');
-        console.log('Metro data count:', result.metro ? result.metro.count : 0);
-        console.log('Metro data loaded flag:', result.metro ? result.metro.loaded : false);
-
-        // Check the actual data structure
-        if (result.metro && result.metro.data && result.metro.data.length > 0) {
-            console.log('First metro row RAW:', result.metro.data[0]);
-            console.log('Column names in first row:', Object.keys(result.metro.data[0]));
-            
-            // Test parse a single row
-            const testRow = result.metro.data[0];
-            console.log('Test parsing row:');
-            console.log('  osm_id:', testRow['\ufeffosm_id'] || testRow.osm_id);
-            console.log('  latitude:', testRow.latitude, '->', parseFloat(testRow.latitude));
-            console.log('  longitude:', testRow.longitude, '->', parseFloat(testRow.longitude));
-            console.log('  shadecoverage:', testRow.shadecoverage, '->', parseFloat(testRow.shadecoverage.replace('%', '')));
+        
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
         }
         
-        // Process each data type
-        if (result.metro.loaded && result.metro.data && result.metro.data.length > 0) {
-            console.log('Processing metro data...');
-            processMetroDataFromServer(result.metro.data);
-            updateStatusItem('metro', 'loaded', `Metro: ${result.metro.count} exits`);
+        const allData = await response.json();
+        
+        if (!allData.success) {
+            throw new Error('Server response indicates failure');
+        }
+        
+        console.log('Received data structure:', {
+            metro: allData.metro?.length || 0,
+            fountains: allData.fountains?.length || 0,
+            benches: allData.benches?.length || 0,
+            geojsonUrl: allData.street_geojson_url
+        });
+        
+        // Process metro data
+        if (allData.metro && allData.metro.length > 0) {
+            updateAllStatus('loading', `Processing ${allData.metro.length} metro stations...`);
+            processMetroDataFromServer(allData.metro);
+            updateStatusItem('metro', 'success', `✅ Loaded ${allData.metro.length} metro entries`);
         } else {
-            console.warn('No metro data available');
-            updateStatusItem('metro', 'error', 'Metro: No data');
+            updateStatusItem('metro', 'warning', '⚠️ No metro data received');
         }
         
-        if (result.fountains.loaded && result.fountains.data && result.fountains.data.length > 0) {
-            console.log('Processing fountain data...');
-            processFountainDataFromServer(result.fountains.data);
-            updateStatusItem('fountains', 'loaded', `Fountains: ${result.fountains.count}`);
+        // Process fountain data
+        if (allData.fountains && allData.fountains.length > 0) {
+            updateAllStatus('loading', 'Processing fountain data...');
+            processFountainDataFromServer(allData.fountains);
+            updateStatusItem('fountains', 'success', `✅ Loaded ${allData.fountains.length} fountains`);
         } else {
-            console.warn('No fountain data available');
-            updateStatusItem('fountains', 'error', 'Fountains: No data');
+            updateStatusItem('fountains', 'warning', '⚠️ No fountain data received');
         }
         
-        if (result.benches.loaded && result.benches.data && result.benches.data.length > 0) {
-            console.log('Processing bench data...');
-            processBenchDataFromServer(result.benches.data);
-            updateStatusItem('benches', 'loaded', `Benches: ${result.benches.count}`);
+        // Process bench data
+        if (allData.benches && allData.benches.length > 0) {
+            updateAllStatus('loading', 'Processing bench data...');
+            processBenchDataFromServer(allData.benches);
+            updateStatusItem('benches', 'success', `✅ Loaded ${allData.benches.length} benches`);
         } else {
-            console.warn('No bench data available');
-            updateStatusItem('benches', 'error', 'Benches: No data');
+            updateStatusItem('benches', 'warning', '⚠️ No bench data received');
         }
         
-        updateAllStatus('loaded', `✅ Loaded data from server`);
-        updateStatus('✅ All data loaded successfully from server');
-        
-        // Update stats with loaded data
-        updateStats(
-            Object.keys(stations).length,
-            markers.length,
-            fountainData.length,
-            benchData.length
-        );
-        
-        // Auto-apply filters if metro data was loaded
-        if (result.metro.loaded && result.metro.count > 0) {
-            setTimeout(() => {
-                console.log('Auto-applying filters...');
-                applyFilters();
-            }, 500);
+        // Load street GeoJSON ONCE (stored in global cache)
+        if (allData.street_geojson_url && !window.fullGeoJSON) {
+            updateAllStatus('loading', 'Loading street data (one-time download)...');
+            await loadStreetDataOnce();
         }
+        
+        updateAllStatus('success', '✅ All data loaded successfully');
         
     } catch (error) {
-        console.error('❌ Error loading all data:', error);
-        updateAllStatus('error', `Failed: ${error.message}`);
-        updateStatus(`❌ ${error.message}`, true);
+        console.error('Failed to load data:', error);
+        updateAllStatus('error', `❌ Error: ${error.message}`);
         
-        // Show error in the UI
-        const errorDiv = document.getElementById('data-info');
-        if (errorDiv) {
-            errorDiv.innerHTML = `
-                <p style="color: red;">❌ Failed to load data</p>
-                <p style="font-size: 12px; color: #666;">Error: ${error.message}</p>
-                <p style="font-size: 12px; color: #666;">Troubleshooting:</p>
-                <ul style="font-size: 12px; color: #666; margin-left: 20px;">
-                    <li>Make sure server.py is running (python server.py)</li>
-                    <li>Check if data files exist in ./uploads/ folder</li>
-                    <li>Check browser console (F12) for detailed errors</li>
-                </ul>
-            `;
-        }
+        // Show detailed error
+        const errorDetails = {
+            message: error.message,
+            stack: error.stack
+        };
+        console.error('Detailed error:', errorDetails);
     }
 }
 
@@ -1206,7 +1146,7 @@ async function debugServerConnection() {
     
     // Test basic connectivity
     try {
-        const testResponse = await fetch(`${API_BASE_URL}/api/test`);
+        const testResponse = await fetch(`${API_BASE_URL}/api/data-status`);
         console.log('Test endpoint response:', await testResponse.json());
     } catch (e) {
         console.error('Cannot connect to test endpoint:', e.message);
@@ -1221,13 +1161,18 @@ async function debugServerConnection() {
         console.error('Cannot get data status:', e.message);
     }
     
-    // Debug data
+    // Check all-data endpoint
     try {
-        const debugResponse = await fetch(`${API_BASE_URL}/api/debug-data`);
-        const debug = await debugResponse.json();
-        console.log('Debug data:', debug);
+        const dataResponse = await fetch(`${API_BASE_URL}/api/all-data`);
+        const allData = await dataResponse.json();
+        console.log('All data structure:', {
+            metro: allData.metro?.length,
+            fountains: allData.fountains?.length,
+            benches: allData.benches?.length,
+            geojsonUrl: allData.street_geojson_url
+        });
     } catch (e) {
-        console.error('Cannot get debug data:', e.message);
+        console.error('All-data fetch failed:', e.message);
     }
     
     console.log('=== END DEBUG ===');
@@ -1236,25 +1181,84 @@ async function debugServerConnection() {
 // Call this from browser console to debug
 window.debugServer = debugServerConnection;
 
-async function checkServerStatus() {
+// Load street GeoJSON data once and cache it globally
+async function loadStreetDataOnce() {
+    if (window.fullGeoJSON) {
+        console.log('Street GeoJSON already cached');
+        return true;
+    }
+    
+    if (isLoadingGeoJSON) {
+        console.log('Street GeoJSON load already in progress');
+        return false;
+    }
+    
+    isLoadingGeoJSON = true;
+    
     try {
-        updateStatus('Checking server status...');
+        console.log('Starting one-time street GeoJSON download...');
+        updateStatus('📥 Downloading street data (one-time, ~300MB)...');
         
-        const response = await fetch(`${API_BASE_URL}/api/data-status`);
-        const status = await response.json();
+        const response = await fetch(`${API_BASE_URL}/api/data/street-segments`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
         
-        let statusMessage = 'Server Status:\n';
-        statusMessage += `  Metro data: ${status.metro_data.loaded ? '✅ Loaded' : '❌ Not loaded'} (${status.metro_data.count} records)\n`;
-        statusMessage += `  Fountains: ${status.fountain_data.loaded ? '✅ Loaded' : '❌ Not loaded'} (${status.fountain_data.count} records)\n`;
-        statusMessage += `  Benches: ${status.bench_data.loaded ? '✅ Loaded' : '❌ Not loaded'} (${status.bench_data.count} records)\n`;
-        statusMessage += `  Street data: ${status.street_data.loaded ? '✅ Loaded' : '❌ Not loaded'} (${status.street_data.count} segments)`;
+        if (!response.ok) {
+            throw new Error(`Failed to fetch GeoJSON: ${response.status}`);
+        }
         
-        alert(statusMessage);
-        updateStatus('Server status checked');
+        // Parse the large GeoJSON
+        const geojson = await response.json();
+        
+        if (!geojson.features || !Array.isArray(geojson.features)) {
+            throw new Error('Invalid GeoJSON structure');
+        }
+        
+        // Store globally
+        window.fullGeoJSON = geojson;
+        
+        console.log(`✅ Street GeoJSON cached: ${geojson.features.length} features`);
+        updateStatus(`✅ Street data ready: ${geojson.features.length.toLocaleString()} segments`);
+        
+        // Initialize visualizer if needed
+        if (streetVisualizer && !streetVisualizer.dataLoaded) {
+            streetVisualizer.dataLoaded = true;
+        }
+        
+        return true;
         
     } catch (error) {
-        console.error('Error checking server status:', error);
-        updateStatus('❌ Cannot connect to server. Make sure server.py is running.', true);
+        console.error('Failed to load street GeoJSON:', error);
+        updateStatus(`❌ Street data load failed: ${error.message}`, true);
+        window.fullGeoJSON = null;
+        return false;
+    } finally {
+        isLoadingGeoJSON = false;
+    }
+}
+
+async function checkServerStatus() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/data-status`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        
+        if (response.ok) {
+            const status = await response.json();
+            console.log('Server Status:', status);
+            updateStatus(`Server online: ${status.files?.metro || 0} metro, ${status.files?.fountains || 0} fountains`);
+            return true;
+        } else {
+            updateStatus('❌ Server unreachable', true);
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('Server status check failed:', error);
+        updateStatus('❌ Cannot connect to server', true);
+        return false;
     }
 }
 
@@ -1337,7 +1341,7 @@ class StreetShadeVisualizer {
         if (this.initialized) return;
         
         try {
-            const response = await fetch(`${API_BASE_URL}/street-data/summary`);
+            const response = await fetch(`${API_BASE_URL}/data-status`);
             const data = await response.json();
             
             if (data.loaded && data.total_segments > 0) {
@@ -1680,8 +1684,15 @@ class StreetShadeVisualizer {
     }
     
     async updateHeatmapByTime(time) {
-    if (!this.dataLoaded || !this.heatmapLayer) {
-        console.log('Cannot update: no data or no heatmap layer');
+    if (!this.heatmapLayer) {
+        console.log('Cannot update: no heatmap layer');
+        return;
+    }
+    
+    // Check if GeoJSON is loaded
+    if (!window.fullGeoJSON) {
+        console.log('Street GeoJSON not loaded yet');
+        updateStatus('⏳ Loading street data...');
         return;
     }
     
@@ -1692,55 +1703,70 @@ class StreetShadeVisualizer {
     }
     
     this.currentTime = time;
+    this.dataLoaded = true;
     const zoom = map.getZoom();
     const bounds = map.getBounds();
     
     try {
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
-        const boundsStr = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
-        
         console.log(`Updating heatmap: Time=${time}, Zoom=${zoom}`);
         
         // Calculate appropriate max points based on zoom
         let maxPoints = this.calculateMaxPoints(zoom);
         
-        // Request data from server
-        const response = await fetch(
-            `${API_BASE_URL}/street-heatmap-points?time=${encodeURIComponent(time)}&bounds=${boundsStr}&max=${maxPoints}`
-        );
+        // CLIENT-SIDE FILTERING: Filter features by bounds
+        const featuresInView = filterFeaturesByBounds(window.fullGeoJSON.features, bounds);
         
-        const data = await response.json();
+        console.log(`Filtered ${featuresInView.length} features in view from ${window.fullGeoJSON.features.length} total`);
         
-        if (data.error) {
-            console.error('Server error:', data.error);
-            updateStatus(`❌ Server error: ${data.error}`, true);
-            return;
+        // Extract points with shade values for the selected time
+        const heatmapPoints = [];
+        let zeroCount = 0;
+        
+        featuresInView.forEach(feature => {
+            if (!feature.geometry || feature.geometry.type !== 'LineString') return;
+            
+            const shadeValue = getShadeValueForTime(feature, time);
+            if (shadeValue === null) return;
+            
+            if (shadeValue === 0) zeroCount++;
+            
+            // Convert LineString coordinates to heatmap points
+            const coords = feature.geometry.coordinates;
+            coords.forEach(([lng, lat]) => {
+                // Transform to GCJ-02
+                const [gcjLng, gcjLat] = transformWGS84ToGCJ02(lng, lat);
+                
+                heatmapPoints.push({
+                    lng: gcjLng,
+                    lat: gcjLat,
+                    count: Math.max(shadeValue, 0.1) // Ensure minimum visibility
+                });
+            });
+        });
+        
+        // Limit points if needed
+        let finalPoints = heatmapPoints;
+        if (heatmapPoints.length > maxPoints) {
+            // Sample points uniformly
+            const step = Math.ceil(heatmapPoints.length / maxPoints);
+            finalPoints = heatmapPoints.filter((_, i) => i % step === 0);
+            console.log(`Sampled ${finalPoints.length} points from ${heatmapPoints.length}`);
         }
         
-        if (data.points && data.points.length > 0) {
-            console.log(`Received ${data.points.length} points (${data.total} total), Zero values: ${data.zero_count || 0}`);
-            
-            // Prepare points for heatmap
-            const heatmapPoints = data.points.map(p => ({
-                lng: p.lng,
-                lat: p.lat, 
-                count: p.count
-            }));
-            
+        if (finalPoints.length > 0) {
             // Store for potential re-use
-            this.heatmapData = heatmapPoints;
+            this.heatmapData = finalPoints;
             
-            // Set data to heatmap with adjusted gradient for zero values
-            this.setHeatmapData(heatmapPoints);
+            // Set data to heatmap
+            this.setHeatmapData(finalPoints);
             
             // Get current date for display
             const dateFilter = document.getElementById('date-filter');
             const currentDate = dateFilter ? dateFilter.value : 'June 21st';
             
-            let statusMsg = `✅ ${currentDate} ${time}: ${data.points.length.toLocaleString()} street points`;
-            if (data.zero_count > 0) {
-                statusMsg += ` (${data.zero_count} zero-shade areas)`;
+            let statusMsg = `✅ ${currentDate} ${time}: ${finalPoints.length.toLocaleString()} street points`;
+            if (zeroCount > 0) {
+                statusMsg += ` (${zeroCount} with 0% shade)`;
             }
             updateStatus(statusMsg);
             
@@ -1752,15 +1778,24 @@ class StreetShadeVisualizer {
         
     } catch (error) {
         console.error('Failed to update heatmap:', error);
-        updateStatus('❌ Failed to load street data: ' + error.message, true);
+        updateStatus('❌ Failed to process street data: ' + error.message, true);
     }
 }
     
     async updateStreetLinesByStation() {
-        if (!this.dataLoaded || !this.stationCenter) {
-            console.log('Cannot update street lines: no data or no station center');
+        if (!this.stationCenter) {
+            console.log('Cannot update street lines: no station center');
             return;
         }
+        
+        // Check if GeoJSON is loaded
+        if (!window.fullGeoJSON) {
+            console.log('Street GeoJSON not loaded yet');
+            updateStatus('⏳ Loading street data...');
+            return;
+        }
+        
+        this.dataLoaded = true;
         
         // Check date filter
         if (!this.shouldShowHeatmap()) {
@@ -1771,24 +1806,36 @@ class StreetShadeVisualizer {
         try {
             console.log(`Updating street lines around station: ${this.stationCenter.lng}, ${this.stationCenter.lat}`);
             
-            // Request street segments within radius from server
-            const response = await fetch(
-                `${API_BASE_URL}/street-segments?time=${encodeURIComponent(this.currentTime)}&center=${this.stationCenter.lng},${this.stationCenter.lat}&radius=${this.stationRadius}`
+            // CLIENT-SIDE FILTERING: Filter by radius
+            const featuresInRadius = filterFeaturesByRadius(
+                window.fullGeoJSON.features,
+                this.stationCenter.lng,
+                this.stationCenter.lat,
+                this.stationRadius
             );
             
-            const data = await response.json();
+            console.log(`Found ${featuresInRadius.length} features within ${this.stationRadius}km radius`);
             
-            if (data.error) {
-                console.error('Server error:', data.error);
-                updateStatus(`❌ Server error: ${data.error}`, true);
-                return;
-            }
+            // Convert to segment format with shade values
+            const segments = [];
             
-            if (data.segments && data.segments.length > 0) {
-                console.log(`Received ${data.segments.length} street segments`);
-                this.renderStreetLines(data.segments);
+            featuresInRadius.forEach(feature => {
+                if (!feature.geometry || feature.geometry.type !== 'LineString') return;
                 
-                updateStatus(`✅ ${data.segments.length} street segments around station (${this.currentTime})`);
+                const shadeValue = getShadeValueForTime(feature, this.currentTime);
+                if (shadeValue === null) return;
+                
+                segments.push({
+                    coordinates: feature.geometry.coordinates,
+                    shade_coverage: shadeValue
+                });
+            });
+            
+            if (segments.length > 0) {
+                console.log(`Rendering ${segments.length} street segments`);
+                this.renderStreetLines(segments);
+                
+                updateStatus(`✅ ${segments.length} street segments around station (${this.currentTime})`);
             } else {
                 console.log('No street segments in radius');
                 this.clearStreetLines();
@@ -1797,7 +1844,7 @@ class StreetShadeVisualizer {
             
         } catch (error) {
             console.error('Failed to update street lines:', error);
-            updateStatus('❌ Failed to load street segments: ' + error.message, true);
+            updateStatus('❌ Failed to process street segments: ' + error.message, true);
         }
     }
     
@@ -2459,6 +2506,65 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
         Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c; // Distance in kilometers
+}
+
+// Get shade value from GeoJSON feature for a specific time
+function getShadeValueForTime(feature, timeString) {
+    if (!feature || !feature.properties) return null;
+    
+    // Format: s_0621_HH (e.g., s_0621_08 for 8am)
+    const hour = timeString.split(':')[0].padStart(2, '0');
+    const propertyKey = `s_0621_${hour}`;
+    
+    return feature.properties[propertyKey] !== undefined ? 
+           parseFloat(feature.properties[propertyKey]) : null;
+}
+
+// Filter GeoJSON features by bounding box
+function filterFeaturesByBounds(features, bounds) {
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+    
+    return features.filter(feature => {
+        if (!feature.geometry || !feature.geometry.coordinates) return false;
+        
+        // Check if any coordinate is within bounds
+        const coords = feature.geometry.coordinates;
+        
+        if (feature.geometry.type === 'LineString') {
+            return coords.some(([lng, lat]) => 
+                lng >= sw.lng && lng <= ne.lng &&
+                lat >= sw.lat && lat <= ne.lat
+            );
+        } else if (feature.geometry.type === 'Point') {
+            const [lng, lat] = coords;
+            return lng >= sw.lng && lng <= ne.lng &&
+                   lat >= sw.lat && lat <= ne.lat;
+        }
+        
+        return false;
+    });
+}
+
+// Filter GeoJSON features by radius from center point
+function filterFeaturesByRadius(features, centerLng, centerLat, radiusKm) {
+    return features.filter(feature => {
+        if (!feature.geometry || !feature.geometry.coordinates) return false;
+        
+        const coords = feature.geometry.coordinates;
+        
+        if (feature.geometry.type === 'LineString') {
+            // Check if any point in the line is within radius
+            return coords.some(([lng, lat]) => 
+                calculateDistance(centerLat, centerLng, lat, lng) <= radiusKm
+            );
+        } else if (feature.geometry.type === 'Point') {
+            const [lng, lat] = coords;
+            return calculateDistance(centerLat, centerLng, lat, lng) <= radiusKm;
+        }
+        
+        return false;
+    });
 }
 
 
@@ -3332,6 +3438,13 @@ function clearMap() {
 function clearFountainMarkers() {
     fountainMarkers.forEach(marker => marker.setMap(null));
     fountainMarkers = [];
+}
+
+function clearStreetVisualization() {
+    if (streetVisualizer) {
+        streetVisualizer.clear();
+        updateStatus('Street visualization cleared');
+    }
 }
 
 function updateStats(stationCount, exitCount, fountainCount = 0, benchCount = 0) {
