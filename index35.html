@@ -450,7 +450,7 @@ async function loadAndShowFountains() {
     if (!fountainData || fountainData.length === 0) {
         updateStatus('Loading fountain data...');
         try {
-            await loadDataFromServer('fountains');
+            await loadAllData();
         } catch (error) {
             updateStatus(`Failed to load fountains: ${error.message}`, true);
             return;
@@ -468,7 +468,7 @@ async function loadAndShowBenches() {
     if (!benchData || benchData.length === 0) {
         updateStatus('Loading bench data...');
         try {
-            await loadDataFromServer('benches');
+            await loadAllData();
         } catch (error) {
             updateStatus(`Failed to load benches: ${error.message}`, true);
             return;
@@ -617,15 +617,15 @@ function initMap() {
             map.addControl(new AMap.Scale());
         });
         
-        // Initialize street visualizer (it will auto-load from server)
+        // Initialize street visualizer
         streetVisualizer = new StreetShadeVisualizer();
         setTimeout(() => {
             streetVisualizer.init();
         }, 1000);
         
-        // Auto-load metro data immediately - this loads the metro_stations_exit_shadow_results.csv
+        // Auto-load all data from server using the new unified endpoint
         setTimeout(() => {
-            loadDataFromServer('metro');
+            loadAllData();
         }, 500);
         
         updateStatus('Map ready. Loading data from server...');
@@ -636,55 +636,17 @@ function initMap() {
     }
 }
 
-// These should call the correct processing functions
+// Legacy function - kept for backward compatibility but not used in normal flow
+// All data should be loaded via loadAllData() which uses /api/all-data
 async function loadDataFromServer(type) {
-    try {
-        updateStatus(`Loading ${type} data from server...`);
-        
-        let endpoint;
-        
-        switch(type) {
-            case 'metro':
-                endpoint = '/api/metro-exits';
-                break;
-            case 'fountains':
-                endpoint = '/api/water-fountains';
-                break;
-            case 'benches':
-                endpoint = '/api/benches';
-                break;
-            default:
-                throw new Error('Unknown data type');
-        }
-        
-        // Fetch data from server
-        const response = await fetch(`${API_BASE_URL}${endpoint}`);
-        const result = await response.json();
-        
-        if (result.success) {
-            // Call the CORRECT processing function based on type
-            switch(type) {
-                case 'metro':
-                    processMetroDataFromServer(result.data);  // CORRECT
-                    // Auto-load fountains and benches after metro data loads
-                    //setTimeout(() => loadDataFromServer('fountains'), 500);
-                    //setTimeout(() => loadDataFromServer('benches'), 1000);
-                    break;
-                case 'fountains':
-                    processFountainDataFromServer(result.data);  // CORRECT
-                    break;
-                case 'benches':
-                    processBenchDataFromServer(result.data);  // CORRECT
-                    break;
-            }
-            updateStatus(`✅ Loaded ${result.count} ${type} from server`);
-        } else {
-            updateStatus(`❌ Failed to load ${type}: ${result.error}`, true);
-        }
-        
-    } catch (error) {
-        console.error(`Error loading ${type}:`, error);
-        updateStatus(`❌ Error loading ${type}: ${error.message}`, true);
+    console.warn('loadDataFromServer is deprecated. Use loadAllData() instead.');
+    
+    // If called, redirect to loadAllData
+    if (!window.fullGeoJSON || Object.keys(stations).length === 0) {
+        console.log('Redirecting to loadAllData()...');
+        await loadAllData();
+    } else {
+        console.log('Data already loaded');
     }
 }
 
