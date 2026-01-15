@@ -1,0 +1,3359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shanghai Metro - Shade Coverage Analysis</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 1600px; 
+            margin: 0 auto; 
+        }
+        h1 { 
+            text-align: center; 
+            color: #333; 
+            margin-bottom: 10px; 
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .control-panel { 
+            background: white; 
+            padding: 20px; 
+            margin: 10px 0; 
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .search-box { 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+            margin-bottom: 15px; 
+            flex-wrap: wrap;
+        }
+        #station-search { 
+            padding: 12px; 
+            flex: 1; 
+            min-width: 200px;
+            font-size: 16px; 
+            border: 2px solid #ddd;
+            border-radius: 4px;
+        }
+        button { 
+            padding: 12px 20px; 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button:hover { 
+            background: #45a049; 
+        }
+        #map-container { 
+            width: 100%; 
+            height: 600px; 
+            margin: 20px 0; 
+            border: 2px solid #ddd; 
+            border-radius: 8px;
+            position: relative;
+        }
+        .info-panel { 
+            background: white; 
+            padding: 20px; 
+            margin: 10px 0; 
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .station-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .station-item {
+            border: 1px solid #e0e0e0;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .station-item:hover {
+            background-color: #f8f9fa;
+            border-color: #4CAF50;
+        }
+        .exit-count {
+            background: #ff9800;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        .file-upload {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border: 2px dashed #ddd;
+            text-align: center;
+            margin: 10px 0;
+        }
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin: 10px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .stat-item {
+            background: #e3f2fd;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+        
+        /* Sun Analysis Styles */
+        .filter-controls {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .filter-group label {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .filter-group select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-width: 150px;
+        }
+        .legend {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 3px 0;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 8px;
+            border: 1px solid #ccc;
+        }
+        .legend-title {
+            grid-column: 1 / -1;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .data-info {
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        /* Sun Position Display */
+        .sun-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 200px;
+        }
+        .sun-elevation {
+            font-size: 24px;
+            font-weight: bold;
+            color: #FF9800;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .sun-path {
+            width: 200px;
+            height: 80px;
+            position: relative;
+            margin: 10px 0;
+        }
+        .sun-arc {
+            position: absolute;
+            width: 200px;
+            height: 100px;
+            border: 2px solid #FFEB3B;
+            border-top: none;
+            border-radius: 100px 100px 0 0;
+            bottom: 0;
+        }
+        .sun-marker {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #FF9800;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px #FF9800;
+        }
+        .time-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* Fountain info styles */
+        .nearest-fountain {
+            background: #E8F5E9;
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .fountain-distance {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2196F3;
+            margin: 5px 0;
+        }
+        .fountain-location {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Shanghai Metro - Shade Coverage Analysis</h1>
+        <div class="subtitle">Visualizing building shade coverage at metro exits</div>
+        
+        <div class="control-panel">
+            <div class="filter-controls">
+                <div class="data-info" id="data-info">
+        <p>Load your CSV file to see available dates and times for analysis.</p>
+    </div>
+                <div class="filter-group">
+                    <label>Date:</label>
+                    <select id="date-filter">
+                        <option value="all">All Dates</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Time:</label>
+                    <select id="time-filter">
+                        <option value="all">All Times</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+    <label>Street Opacity:</label>
+    <input type="range" id="street-opacity" min="0" max="1" step="0.1" value="0.7" 
+           oninput="updateStreetOpacity(this.value)">
+    <span id="opacity-value">70%</span>
+</div>
+                <div class="filter-group">
+                    <label>Actions:</label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button onclick="applyFilters()">Apply Filters</button>
+                        <button onclick="showAllForSelected()">Show All Exits</button>
+                        <button onclick="streetVisualizer.clearStationCenter()" style="background: #607D8B;">🗺️ General View</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-title">Shade Coverage Legend:</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #d73027;"></div>
+                    <span>0-10% coverage (Very Low)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #f46d43;"></div>
+                    <span>10-20% coverage</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #fdae61;"></div>
+                    <span>20-30% coverage</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #fee090;"></div>
+                    <span>30-40% coverage</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e0f3f8;"></div>
+                    <span>40-50% coverage</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #abd9e9;"></div>
+                    <span>50-60% coverage</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #74add1;"></div>
+                    <span>60-70% coverage</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #4575b4;"></div>
+                    <span>70-80% coverage</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #313695;"></div>
+                    <span>80-90% coverage</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #1a237e;"></div>
+                    <span>90-100% coverage (Very High)</span>
+                </div>
+                <div class="legend-title" style="margin-top: 15px;">Additional Markers:</div>
+                <div class="legend-item">
+                    <div style="font-size: 18px; color: #2196F3;">💧</div>
+                    <span>Water Fountain</span>
+                </div>
+                <div class="legend-item">
+    <div style="font-size: 24px; color: #FFD700;">💧</div>
+    <span>Nearest Water Fountain (to searched station)</span>
+</div>
+	<div class="legend-item">
+    <div style="font-size: 18px; color: #4CAF50;">🪑</div>
+    <span>Bench</span>
+</div>
+<div class="legend-item">
+    <div style="font-size: 24px; color: #FF5722;">🪑</div>
+    <span>Nearest Bench (to searched station)</span>
+</div>
+</div>
+
+            <div class="search-box">
+    <input type="text" id="station-search" placeholder="Search for specific station...">
+   <button onclick="searchStation()">Search Station</button>
+<button onclick="clearMap()">Clear Map</button>
+<button onclick="loadAndShowFountains()">💧 Show All Fountains</button>
+<button onclick="loadAndShowBenches()">🪑 Show All Benches</button>
+<button onclick="clearStreetVisualization()">🗑️ Clear Streets</button>
+</div>
+
+            <div class="stats">
+                <div class="stat-item" id="stats-stations">Stations: 0</div>
+                <div class="stat-item" id="stats-exits">Exits: 0</div>
+                <div class="stat-item" id="stats-fountains">Fountains: 0</div>
+		<div class="stat-item" id="stats-benches">Benches: 0</div>
+                <div class="stat-item" id="stats-loaded">Status: No data loaded</div>
+            </div>
+        </div>
+
+        <div id="map-container">
+            <!-- Sun position display will be added here dynamically -->
+        </div>
+
+        <!-- Nearest Fountain Info Panel -->
+        <div class="info-panel" id="nearest-fountain-panel" style="display: none;">
+            <h3>🚰 Nearest Water Fountain</h3>
+            <div id="nearest-fountain-info">
+                <!-- Nearest fountain info will appear here -->
+            </div>
+        </div>
+
+        <!-- All Fountains Info Panel -->
+        <div class="info-panel" id="all-fountains-panel" style="display: none;">
+            <h3>💧 All Water Fountains</h3>
+            <div id="all-fountains-list" style="max-height: 300px; overflow-y: auto;">
+                <!-- All fountains list will appear here -->
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h3>Station Information</h3>
+            <div id="station-info"></div>
+        </div>
+<!-- Nearest Bench Info Panel -->
+<div class="info-panel" id="nearest-bench-panel" style="display: none;">
+    <h3>🪑 Nearest Bench</h3>
+    <div id="nearest-bench-info">
+        <!-- Nearest bench info will appear here -->
+    </div>
+</div>
+
+<!-- All Benches Info Panel -->
+<div class="info-panel" id="all-benches-panel" style="display: none;">
+    <h3>🪑 All Benches</h3>
+    <div id="all-benches-list" style="max-height: 300px; overflow-y: auto;">
+        <!-- All benches list will appear here -->
+    </div>
+</div>
+        <div class="info-panel">
+            <h3>Available Stations</h3>
+            <div class="station-list" id="station-list">
+                <p>Stations will appear here after loading data...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- AMAP JS API -->
+    <!-- Change your AMap script tag to this -->
+<script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=3cd05a57b45f9bdf081aae4cba78d814&plugin=AMap.HeatMap,AMap.ToolBar,AMap.Scale"></script>
+
+    <script>
+let map;
+let markers = [];
+let fountainMarkers = [];
+let osmData = null;
+let stations = {};
+let fountainData = [];
+let availableDates = [];
+let availableTimes = [];
+let currentFilters = { date: 'all', time: 'all' };
+let currentSunElevation = 0;
+let currentTime = '';
+let nearestFountain = null;
+let benchData = [];
+let benchMarkers = [];
+let nearestBench = null;
+let streetData = null;
+let streetHeatmap = null;
+let streetVisualizer = null;
+let currentStreetOpacity = 0.7;
+
+const API_BASE_URL = 'https://the-last-mile-cfpx.onrender.com';
+
+async function loadAndShowFountains() {
+    if (!fountainData || fountainData.length === 0) {
+        updateStatus('Loading fountain data...');
+        try {
+            await loadDataFromServer('fountains');
+        } catch (error) {
+            updateStatus(`Failed to load fountains: ${error.message}`, true);
+            return;
+        }
+    }
+    
+    if (fountainData.length > 0) {
+        showAllFountains();
+    } else {
+        updateStatus('No fountain data available', true);
+    }
+}
+
+async function loadAndShowBenches() {
+    if (!benchData || benchData.length === 0) {
+        updateStatus('Loading bench data...');
+        try {
+            await loadDataFromServer('benches');
+        } catch (error) {
+            updateStatus(`Failed to load benches: ${error.message}`, true);
+            return;
+        }
+    }
+    
+    if (benchData.length > 0) {
+        showAllBenches();
+    } else {
+        updateStatus('No bench data available', true);
+    }
+}
+
+function updateAllStatus(status, message) {
+    const statusElement = document.getElementById('stats-loaded');
+    if (statusElement) {
+        statusElement.textContent = `Status: ${message}`;
+        if (status === 'error') {
+            statusElement.style.color = 'red';
+        } else if (status === 'loading') {
+            statusElement.style.color = 'orange';
+        } else {
+            statusElement.style.color = 'green';
+        }
+    }
+    console.log(`[${status.toUpperCase()}] ${message}`);
+}
+
+function updateStatusItem(type, status, message) {
+    console.log(`${type}: ${message}`);
+    // You could add more specific UI updates here if needed
+}
+
+async function checkServerConnection() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/test`, { 
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+            },
+            mode: 'cors'
+        });
+        return response.ok;
+    } catch (error) {
+        console.log('Server connection check failed:', error.message);
+        return false;
+    }
+}
+
+async function loadAllData() {
+    try {
+        updateAllStatus('loading', 'Loading all data from server...');
+        
+        // Show loading state in stats
+        document.getElementById('stats-loaded').textContent = 'Status: Loading...';
+        document.getElementById('stats-loaded').style.color = 'orange';
+        
+        // Try multiple server URLs
+        const serverUrls = [
+            'https://the-last-mile-cfpx.onrender.com/api/all-data',
+            'https://the-last-mile-cfpx.onrender.com/api/all-data'
+        ];
+        
+        let result = null;
+        let serverUsed = null;
+        let success = false;
+        
+        for (const url of serverUrls) {
+            try {
+                console.log(`Attempting to fetch from: ${url}`);
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                    mode: 'cors'
+                });
+                
+                if (response.ok) {
+                    result = await response.json();
+                    serverUsed = url;
+                    success = true;
+                    console.log(`✅ Connected to server: ${url}`);
+                    break;
+                } else {
+                    console.warn(`Server ${url} responded with status: ${response.status}`);
+                }
+            } catch (error) {
+                console.log(`Cannot connect to ${url}:`, error.message);
+            }
+        }
+        
+        if (!success || !result) {
+            throw new Error('Cannot connect to server. Make sure server.py is running on port 5000.');
+        }
+        
+        if (!result.success) {
+            throw new Error(`Server error: ${result.error || 'Unknown error'}`);
+        }
+        console.log('📞 Calling processMetroDataFromServer...');
+        console.log('Data to pass:', result.metro.data ? result.metro.data.length : 'no data');
+        processMetroDataFromServer(result.metro.data);
+        console.log('📞 processMetroDataFromServer called (check console for errors)');
+        
+        console.log('Server response received from:', serverUsed);
+        console.log('Result structure:', {
+            metro: result.metro ? `Loaded: ${result.metro.loaded}, Count: ${result.metro.count}` : 'No metro data',
+            fountains: result.fountains ? `Loaded: ${result.fountains.loaded}, Count: ${result.fountains.count}` : 'No fountain data',
+            benches: result.benches ? `Loaded: ${result.benches.loaded}, Count: ${result.benches.count}` : 'No bench data'
+        });
+
+        console.log('✅ Server response received');
+        console.log('Metro data count:', result.metro ? result.metro.count : 0);
+        console.log('Metro data loaded flag:', result.metro ? result.metro.loaded : false);
+
+        // Check the actual data structure
+        if (result.metro && result.metro.data && result.metro.data.length > 0) {
+            console.log('First metro row RAW:', result.metro.data[0]);
+            console.log('Column names in first row:', Object.keys(result.metro.data[0]));
+            
+            // Test parse a single row
+            const testRow = result.metro.data[0];
+            console.log('Test parsing row:');
+            console.log('  osm_id:', testRow['\ufeffosm_id'] || testRow.osm_id);
+            console.log('  latitude:', testRow.latitude, '->', parseFloat(testRow.latitude));
+            console.log('  longitude:', testRow.longitude, '->', parseFloat(testRow.longitude));
+            console.log('  shadecoverage:', testRow.shadecoverage, '->', parseFloat(testRow.shadecoverage.replace('%', '')));
+        }
+        
+        // Process each data type
+        if (result.metro.loaded && result.metro.data && result.metro.data.length > 0) {
+            console.log('Processing metro data...');
+            processMetroDataFromServer(result.metro.data);
+            updateStatusItem('metro', 'loaded', `Metro: ${result.metro.count} exits`);
+        } else {
+            console.warn('No metro data available');
+            updateStatusItem('metro', 'error', 'Metro: No data');
+        }
+        
+        if (result.fountains.loaded && result.fountains.data && result.fountains.data.length > 0) {
+            console.log('Processing fountain data...');
+            processFountainDataFromServer(result.fountains.data);
+            updateStatusItem('fountains', 'loaded', `Fountains: ${result.fountains.count}`);
+        } else {
+            console.warn('No fountain data available');
+            updateStatusItem('fountains', 'error', 'Fountains: No data');
+        }
+        
+        if (result.benches.loaded && result.benches.data && result.benches.data.length > 0) {
+            console.log('Processing bench data...');
+            processBenchDataFromServer(result.benches.data);
+            updateStatusItem('benches', 'loaded', `Benches: ${result.benches.count}`);
+        } else {
+            console.warn('No bench data available');
+            updateStatusItem('benches', 'error', 'Benches: No data');
+        }
+        
+        updateAllStatus('loaded', `✅ Loaded data from server`);
+        updateStatus('✅ All data loaded successfully from server');
+        
+        // Update stats with loaded data
+        updateStats(
+            Object.keys(stations).length,
+            markers.length,
+            fountainData.length,
+            benchData.length
+        );
+        
+        // Auto-apply filters if metro data was loaded
+        if (result.metro.loaded && result.metro.count > 0) {
+            setTimeout(() => {
+                console.log('Auto-applying filters...');
+                applyFilters();
+            }, 500);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error loading all data:', error);
+        updateAllStatus('error', `Failed: ${error.message}`);
+        updateStatus(`❌ ${error.message}`, true);
+        
+        // Show error in the UI
+        const errorDiv = document.getElementById('data-info');
+        if (errorDiv) {
+            errorDiv.innerHTML = `
+                <p style="color: red;">❌ Failed to load data</p>
+                <p style="font-size: 12px; color: #666;">Error: ${error.message}</p>
+                <p style="font-size: 12px; color: #666;">Troubleshooting:</p>
+                <ul style="font-size: 12px; color: #666; margin-left: 20px;">
+                    <li>Make sure server.py is running (python server.py)</li>
+                    <li>Check if data files exist in ./uploads/ folder</li>
+                    <li>Check browser console (F12) for detailed errors</li>
+                </ul>
+            `;
+        }
+    }
+}
+
+// Call this in your initMap function
+function initMap() {
+    try {
+        map = new AMap.Map('map-container', {
+            zoom: 11,
+            center: [121.47, 31.23],
+            viewMode: '3D'
+        });
+        
+        AMap.plugin(['AMap.ToolBar', 'AMap.Scale'], function() {
+            map.addControl(new AMap.ToolBar());
+            map.addControl(new AMap.Scale());
+        });
+        
+        // Initialize street visualizer (it will auto-load from server)
+        streetVisualizer = new StreetShadeVisualizer();
+        setTimeout(() => {
+            streetVisualizer.init();
+        }, 1000);
+        
+        // Auto-load metro data immediately - this loads the metro_stations_exit_shadow_results.csv
+        setTimeout(() => {
+            loadDataFromServer('metro');
+        }, 500);
+        
+        updateStatus('Map ready. Loading data from server...');
+        
+    } catch (error) {
+        console.error('Map initialization failed:', error);
+        updateStatus('Map failed to load. Check your API key.', true);
+    }
+}
+
+// These should call the correct processing functions
+async function loadDataFromServer(type) {
+    try {
+        updateStatus(`Loading ${type} data from server...`);
+        
+        let endpoint;
+        
+        switch(type) {
+            case 'metro':
+                endpoint = '/api/metro-exits';
+                break;
+            case 'fountains':
+                endpoint = '/api/water-fountains';
+                break;
+            case 'benches':
+                endpoint = '/api/benches';
+                break;
+            default:
+                throw new Error('Unknown data type');
+        }
+        
+        // Fetch data from server
+        const response = await fetch(`${API_BASE_URL}${endpoint}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            // Call the CORRECT processing function based on type
+            switch(type) {
+                case 'metro':
+                    processMetroDataFromServer(result.data);  // CORRECT
+                    // Auto-load fountains and benches after metro data loads
+                    //setTimeout(() => loadDataFromServer('fountains'), 500);
+                    //setTimeout(() => loadDataFromServer('benches'), 1000);
+                    break;
+                case 'fountains':
+                    processFountainDataFromServer(result.data);  // CORRECT
+                    break;
+                case 'benches':
+                    processBenchDataFromServer(result.data);  // CORRECT
+                    break;
+            }
+            updateStatus(`✅ Loaded ${result.count} ${type} from server`);
+        } else {
+            updateStatus(`❌ Failed to load ${type}: ${result.error}`, true);
+        }
+        
+    } catch (error) {
+        console.error(`Error loading ${type}:`, error);
+        updateStatus(`❌ Error loading ${type}: ${error.message}`, true);
+    }
+}
+
+// Add this function and call it from console
+window.debugMetro = function() {
+    console.log('=== METRO DATA DEBUG ===');
+    console.log('osmData:', osmData);
+    console.log('Number of stations:', Object.keys(stations).length);
+    console.log('Available dates:', availableDates);
+    console.log('Available times:', availableTimes);
+    
+    if (Object.keys(stations).length > 0) {
+        const firstStation = stations[Object.keys(stations)[0]];
+        console.log('First station:', firstStation.name);
+        console.log('First station exits:', firstStation.exits.length);
+        console.log('Sample exit:', firstStation.exits[0]);
+        console.log('Time data for first exit:', firstStation.exits[0].timeData);
+    }
+};
+
+function processMetroDataFromServer(data) {
+    let exitCount = 0;  // Move declaration outside try block
+    try {
+    console.log('🚨 processMetroDataFromServer CALLED!');
+    console.log('Data type:', typeof data);
+    console.log('Is array?', Array.isArray(data));
+    console.log('Length:', data ? data.length : 'null');
+    console.log('=== DEBUG: Processing metro data ===');
+    console.log('Columns in first row:', Object.keys(data[0]));
+    
+    // Clear existing data
+    stations = {};
+    availableDates = [];
+    availableTimes = [];
+
+    markers.forEach(marker => marker.setMap(null));
+    markers = [];
+
+    if (!data || !Array.isArray(data)) {
+        console.error('Invalid metro data:', data);
+        updateStatus('❌ Invalid metro data received from server', true);
+        return;
+    }
+    
+    if (data.length === 0) {
+        updateStatus('❌ Metro data is empty', true);
+        return;
+    }
+    
+    console.log('Input data rows:', data.length);
+    
+    // let exitCount = 0;  // Remove from here
+    const dateSet = new Set();
+    const timeSet = new Set();
+
+
+    
+    // Process each data row from server
+    data.forEach((row, i) => {
+        if (i < 5) {  // Only log first 5 rows for debugging
+            console.log(`Row ${i} processing...`);
+        }
+
+        try {
+            // Debug first few rows
+            if (i < 3) {
+                console.log(`Row ${i}:`, row);
+            }
+            
+            // Handle BOM in column name - check both possibilities
+            let osmId = row['\ufeffosm_id'] || row.osm_id || `exit-${i}`;
+            
+            // Get coordinates - they should be strings that need parsing
+            const lat = parseFloat(row.latitude);
+            const lng = parseFloat(row.longitude);
+            
+            // Other fields
+            const exitNumber = row.exit_number || `Exit ${i}`;
+            const parentStation = row.parent_station || 'Unknown Station';
+            const date = row.date || 'Unknown Date';
+            const time = row.time || 'Unknown Time';
+            const sunElevation = parseFloat(row.sun_elevation || 0);
+            
+            // Parse in_sunlight (could be "0"/"1" or "true"/"false")
+            const sunlightVal = row.in_sunlight;
+            let inSunlight = false;
+            if (sunlightVal === '1' || sunlightVal === 1 || 
+                sunlightVal === 'true' || sunlightVal === 'True' || sunlightVal === true) {
+                inSunlight = true;
+            }
+            
+            // IMPORTANT: Handle shadecoverage (no underscore) and remove % sign
+            let shadeCoverageStr = row.shadecoverage || row.shade_coverage || '0';
+            // Remove % sign if present and convert to float
+            shadeCoverageStr = shadeCoverageStr.replace('%', '');
+            const shadeCoverage = parseFloat(shadeCoverageStr) || 0;
+            
+            // Validate coordinates
+            if (isNaN(lat) || isNaN(lng)) {
+                console.warn(`Skipping row ${i}: Invalid coordinates lat=${lat}, lng=${lng}`);
+                return;
+            }
+            
+            // Validate parent station name
+            if (!parentStation || parentStation === 'Unknown Station') {
+                console.warn(`Row ${i} has no station name:`, parentStation);
+            }
+            
+            // Initialize station if it doesn't exist
+            if (!stations[parentStation]) {
+                stations[parentStation] = {
+                    name: parentStation,
+                    exits: []
+                };
+            }
+            
+            // Check if this exit already exists for this station
+            let exit = stations[parentStation].exits.find(e => 
+                e.osm_id === osmId && e.exit_number === exitNumber
+            );
+            
+            if (!exit) {
+                exit = {
+                    osm_id: osmId,
+                    exit_number: exitNumber,
+                    latitude: lat,
+                    longitude: lng,
+                    timeData: []
+                };
+                stations[parentStation].exits.push(exit);
+                exitCount++;
+            }
+            
+            // Add time data for this exit
+            exit.timeData.push({
+                date: date,
+                time: time,
+                sun_elevation: sunElevation,
+                in_sunlight: inSunlight,
+                shade_coverage: shadeCoverage
+            });
+            
+            // Collect unique dates and times
+            if (date !== 'Unknown Date') dateSet.add(date);
+            if (time !== 'Unknown Time') timeSet.add(time);
+            
+        } catch (error) {
+            console.error(`❌ Error at row ${i}:`, error);
+            console.error('Row data that caused error:', row);
+        }
+        
+    });
+    
+    osmData = stations;
+    availableDates = Array.from(dateSet).sort();
+    availableTimes = Array.from(timeSet).sort();
+    
+    console.log('Processing complete:', {
+        stations: Object.keys(stations).length,
+        exits: exitCount,
+        dates: availableDates.length,
+        times: availableTimes.length,
+        sampleStation: Object.keys(stations)[0]
+    });
+    
+    // Update UI
+    updateFilterControls();
+    updateStats(Object.keys(stations).length, exitCount, fountainData.length, benchData.length);
+    updateStationList();
+    
+    const infoText = `Loaded ${exitCount} exits from ${Object.keys(stations).length} stations. ` +
+                   `Data available for ${availableDates.length} dates and ${availableTimes.length} time points.`;
+    updateStatus(infoText);
+    updateDataInfo(infoText);
+    
+    // Log a sample station for verification
+    if (Object.keys(stations).length > 0) {
+        const firstStation = stations[Object.keys(stations)[0]];
+        console.log('Sample station:', firstStation.name, 'with', firstStation.exits.length, 'exits');
+        if (firstStation.exits.length > 0) {
+            console.log('Sample exit:', firstStation.exits[0]);
+        }
+    }
+    
+    // Automatically apply filters to show the data on the map
+    setTimeout(() => {
+        console.log('Auto-applying filters after data load...');
+        applyFilters();
+    }, 100);
+    
+    console.log('🚨 END processMetroDataFromServer');
+    console.log('Stations found:', Object.keys(stations).length);
+    console.log('Exits found:', exitCount);
+    } catch (error) {
+        console.error('💥 ERROR in processMetroDataFromServer:', error);
+        console.error('Error stack:', error.stack);
+    }
+}
+
+function processFountainDataFromServer(data) {
+    console.log('Processing fountain data from server. Raw data sample:', data ? data.slice(0, 3) : 'No data');
+    
+    fountainData = [];
+    
+    if (!data || !Array.isArray(data)) {
+        console.error('Invalid fountain data:', data);
+        updateStatus('❌ Invalid fountain data received from server', true);
+        return;
+    }
+    
+    if (data.length === 0) {
+        updateStatus('❌ Fountain data is empty', true);
+        return;
+    }
+    
+    // Log column names for debugging
+    if (data.length > 0) {
+        console.log('First fountain row columns:', Object.keys(data[0]));
+        console.log('First fountain row sample:', data[0]);
+    }
+    
+    let validCount = 0;
+    let invalidCount = 0;
+    
+    data.forEach((row, index) => {
+        try {
+            let lon, lat;
+            
+            // Method 1: Try exact column names first
+            if (row.origin_lon !== undefined && row.origin_lat !== undefined) {
+                lon = parseFloat(row.origin_lon);
+                lat = parseFloat(row.origin_lat);
+            } 
+            // Method 2: Try common column names
+            else if (row.longitude !== undefined && row.latitude !== undefined) {
+                lon = parseFloat(row.longitude);
+                lat = parseFloat(row.latitude);
+            } 
+            // Method 3: Try abbreviated names
+            else if (row.lon !== undefined && row.lat !== undefined) {
+                lon = parseFloat(row.lon);
+                lat = parseFloat(row.lat);
+            } 
+            // Method 4: Try other common variations
+            else if (row.lng !== undefined && row.lat !== undefined) {
+                lon = parseFloat(row.lng);
+                lat = parseFloat(row.lat);
+            }
+            // Method 5: Try to find any numeric columns that look like coordinates
+            else {
+                const keys = Object.keys(row);
+                const numericValues = [];
+                
+                // Collect all numeric values
+                keys.forEach(key => {
+                    const val = parseFloat(row[key]);
+                    if (!isNaN(val)) {
+                        numericValues.push({
+                            key: key,
+                            value: val,
+                            isLikelyLon: Math.abs(val - 121.47) < 5, // Shanghai longitude range
+                            isLikelyLat: Math.abs(val - 31.23) < 5   // Shanghai latitude range
+                        });
+                    }
+                });
+                
+                // Sort by likelihood of being coordinates
+                const likelyLons = numericValues.filter(v => v.isLikelyLon).sort((a, b) => 
+                    Math.abs(a.value - 121.47) - Math.abs(b.value - 121.47)
+                );
+                const likelyLats = numericValues.filter(v => v.isLikelyLat).sort((a, b) => 
+                    Math.abs(a.value - 31.23) - Math.abs(b.value - 31.23)
+                );
+                
+                if (likelyLons.length > 0 && likelyLats.length > 0) {
+                    lon = likelyLons[0].value;
+                    lat = likelyLats[0].value;
+                    console.log(`Found coordinates by pattern: lon=${lon} (from ${likelyLons[0].key}), lat=${lat} (from ${likelyLats[0].key})`);
+                }
+            }
+            
+            // Validate coordinates (Shanghai area roughly: lon 121-122, lat 31-32)
+            if (!isNaN(lat) && !isNaN(lon)) {
+                if (lon >= 120 && lon <= 123 && lat >= 30 && lat <= 33) {
+                    fountainData.push({
+                        longitude: lon,
+                        latitude: lat,
+                        originalRow: row // Keep original for debugging
+                    });
+                    validCount++;
+                    
+                    if (validCount <= 5) {
+                        console.log(`✓ Added fountain ${validCount}: lon=${lon.toFixed(6)}, lat=${lat.toFixed(6)}`);
+                    }
+                } else {
+                    console.warn(`Skipping fountain ${index}: Coordinates outside Shanghai area (lon=${lon}, lat=${lat})`);
+                    invalidCount++;
+                }
+            } else {
+                console.warn(`Skipping fountain ${index}: Could not parse coordinates. Row:`, row);
+                invalidCount++;
+            }
+        } catch (error) {
+            console.error(`Error processing fountain row ${index}:`, error, row);
+            invalidCount++;
+        }
+    });
+    
+    console.log(`Successfully loaded ${validCount} water fountains, ${invalidCount} rows skipped`);
+    updateStatus(`Loaded ${validCount} water fountain locations from server`);
+    
+    // Update stats
+    updateStats(Object.keys(stations).length, markers.length, fountainData.length);
+    document.getElementById('stats-fountains').textContent = `Fountains: ${fountainData.length}`;
+    
+    // Show first few for verification
+    if (fountainData.length > 0) {
+        console.log('First 3 fountain coordinates:');
+        fountainData.slice(0, 3).forEach((f, i) => {
+            console.log(`  ${i+1}: lon=${f.longitude.toFixed(6)}, lat=${f.latitude.toFixed(6)}`);
+        });
+    }
+}
+
+function processBenchDataFromServer(data) {
+    console.log('Processing bench data from server. Raw data sample:', data ? data.slice(0, 3) : 'No data');
+    
+    benchData = [];
+    
+    if (!data || !Array.isArray(data)) {
+        console.error('Invalid bench data:', data);
+        updateStatus('❌ Invalid bench data received from server', true);
+        return;
+    }
+    
+    if (data.length === 0) {
+        updateStatus('❌ Bench data is empty', true);
+        return;
+    }
+    
+    // Log column names for debugging
+    if (data.length > 0) {
+        console.log('First bench row columns:', Object.keys(data[0]));
+        console.log('First bench row sample:', data[0]);
+    }
+    
+    let validCount = 0;
+    let invalidCount = 0;
+    
+    data.forEach((row, index) => {
+        try {
+            let lon, lat;
+            
+            // Try different possible column name patterns
+            if (row.longitude !== undefined && row.latitude !== undefined) {
+                lon = parseFloat(row.longitude);
+                lat = parseFloat(row.latitude);
+            } else if (row.lon !== undefined && row.lat !== undefined) {
+                lon = parseFloat(row.lon);
+                lat = parseFloat(row.lat);
+            } else if (row.lng !== undefined && row.lat !== undefined) {
+                lon = parseFloat(row.lng);
+                lat = parseFloat(row.lat);
+            } else if (row.x !== undefined && row.y !== undefined) {
+                lon = parseFloat(row.x);
+                lat = parseFloat(row.y);
+            } else if (row.coord_x !== undefined && row.coord_y !== undefined) {
+                lon = parseFloat(row.coord_x);
+                lat = parseFloat(row.coord_y);
+            } else {
+                // Try to find any two numeric columns
+                const keys = Object.keys(row);
+                const numericPairs = [];
+                
+                for (let i = 0; i < keys.length; i++) {
+                    for (let j = i + 1; j < keys.length; j++) {
+                        const val1 = parseFloat(row[keys[i]]);
+                        const val2 = parseFloat(row[keys[j]]);
+                        
+                        if (!isNaN(val1) && !isNaN(val2)) {
+                            // Check which one is likely longitude (larger value in Shanghai)
+                            let potentialLon, potentialLat;
+                            
+                            if (Math.abs(val1 - 121.47) < Math.abs(val2 - 121.47)) {
+                                potentialLon = val1;
+                                potentialLat = val2;
+                            } else {
+                                potentialLon = val2;
+                                potentialLat = val1;
+                            }
+                            
+                            // Validate they're in reasonable range
+                            if (potentialLon >= 120 && potentialLon <= 123 && 
+                                potentialLat >= 30 && potentialLat <= 33) {
+                                numericPairs.push({
+                                    lon: potentialLon,
+                                    lat: potentialLat,
+                                    key1: keys[i],
+                                    key2: keys[j]
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                if (numericPairs.length > 0) {
+                    // Take the first reasonable pair
+                    lon = numericPairs[0].lon;
+                    lat = numericPairs[0].lat;
+                    console.log(`Found bench coordinates in columns: ${numericPairs[0].key1}, ${numericPairs[0].key2}`);
+                }
+            }
+            
+            // Validate coordinates
+            if (!isNaN(lat) && !isNaN(lon)) {
+                if (lon >= 120 && lon <= 123 && lat >= 30 && lat <= 33) {
+                    benchData.push({
+                        longitude: lon,
+                        latitude: lat,
+                        originalRow: row
+                    });
+                    validCount++;
+                    
+                    if (validCount <= 5) {
+                        console.log(`✓ Added bench ${validCount}: lon=${lon.toFixed(6)}, lat=${lat.toFixed(6)}`);
+                    }
+                } else {
+                    console.warn(`Skipping bench ${index}: Coordinates outside Shanghai area (lon=${lon}, lat=${lat})`);
+                    invalidCount++;
+                }
+            } else {
+                console.warn(`Skipping bench ${index}: Could not parse coordinates. Row:`, row);
+                invalidCount++;
+            }
+        } catch (error) {
+            console.error(`Error processing bench row ${index}:`, error, row);
+            invalidCount++;
+        }
+    });
+    
+    console.log(`Successfully loaded ${validCount} benches, ${invalidCount} rows skipped`);
+    updateStatus(`Loaded ${validCount} bench locations from server`);
+    
+    // Update stats
+    updateStats(Object.keys(stations).length, markers.length, fountainData.length, benchData.length);
+    document.getElementById('stats-benches').textContent = `Benches: ${benchData.length}`;
+    
+    // Show first few for verification
+    if (benchData.length > 0) {
+        console.log('First 3 bench coordinates:');
+        benchData.slice(0, 3).forEach((b, i) => {
+            console.log(`  ${i+1}: lon=${b.longitude.toFixed(6)}, lat=${b.latitude.toFixed(6)}`);
+        });
+    }
+}
+
+async function debugServerConnection() {
+    console.log('=== DEBUGGING SERVER CONNECTION ===');
+    
+    // Test basic connectivity
+    try {
+        const testResponse = await fetch(`${API_BASE_URL}/api/test`);
+        console.log('Test endpoint response:', await testResponse.json());
+    } catch (e) {
+        console.error('Cannot connect to test endpoint:', e.message);
+    }
+    
+    // Check data status
+    try {
+        const statusResponse = await fetch(`${API_BASE_URL}/api/data-status`);
+        const status = await statusResponse.json();
+        console.log('Data status:', status);
+    } catch (e) {
+        console.error('Cannot get data status:', e.message);
+    }
+    
+    // Debug data
+    try {
+        const debugResponse = await fetch(`${API_BASE_URL}/api/debug-data`);
+        const debug = await debugResponse.json();
+        console.log('Debug data:', debug);
+    } catch (e) {
+        console.error('Cannot get debug data:', e.message);
+    }
+    
+    console.log('=== END DEBUG ===');
+}
+
+// Call this from browser console to debug
+window.debugServer = debugServerConnection;
+
+async function checkServerStatus() {
+    try {
+        updateStatus('Checking server status...');
+        
+        const response = await fetch(`${API_BASE_URL}/api/data-status`);
+        const status = await response.json();
+        
+        let statusMessage = 'Server Status:\n';
+        statusMessage += `  Metro data: ${status.metro_data.loaded ? '✅ Loaded' : '❌ Not loaded'} (${status.metro_data.count} records)\n`;
+        statusMessage += `  Fountains: ${status.fountain_data.loaded ? '✅ Loaded' : '❌ Not loaded'} (${status.fountain_data.count} records)\n`;
+        statusMessage += `  Benches: ${status.bench_data.loaded ? '✅ Loaded' : '❌ Not loaded'} (${status.bench_data.count} records)\n`;
+        statusMessage += `  Street data: ${status.street_data.loaded ? '✅ Loaded' : '❌ Not loaded'} (${status.street_data.count} segments)`;
+        
+        alert(statusMessage);
+        updateStatus('Server status checked');
+        
+    } catch (error) {
+        console.error('Error checking server status:', error);
+        updateStatus('❌ Cannot connect to server. Make sure server.py is running.', true);
+    }
+}
+
+// Optional: Auto-load data when page loads
+function autoLoadData() {
+    // Wait a bit for map to initialize
+    setTimeout(() => {
+        // Check server status first
+        checkServerStatus();
+        
+        // Auto-load data after a short delay
+        setTimeout(() => {
+            // Uncomment to auto-load all data
+            // loadDataFromServer('metro');
+            // loadDataFromServer('fountains');
+            // loadDataFromServer('benches');
+        }, 2000);
+    }, 1000);
+}
+
+// Call autoLoadData when page loads
+// Add this line at the end of your initMap function or in window.onload
+// autoLoadData();
+
+// Shade coverage color scale (red to blue)
+const shadeCoverageColors = {
+    '0-10': '#d73027',   // Red
+    '10-20': '#f46d43',  // Red-Orange
+    '20-30': '#fdae61',  // Orange
+    '30-40': '#fee090',  // Yellow
+    '40-50': '#e0f3f8',  // Light Blue
+    '50-60': '#abd9e9',  // Blue
+    '60-70': '#74add1',  // Medium Blue
+    '70-80': '#4575b4',  // Dark Blue
+    '80-90': '#313695',  // Darker Blue
+    '90-100': '#1a237e'  // Darkest Blue
+};
+
+function getShadeCoverageColor(coverage) {
+    if (coverage >= 90) return shadeCoverageColors['90-100'];
+    if (coverage >= 80) return shadeCoverageColors['80-90'];
+    if (coverage >= 70) return shadeCoverageColors['70-80'];
+    if (coverage >= 60) return shadeCoverageColors['60-70'];
+    if (coverage >= 50) return shadeCoverageColors['50-60'];
+    if (coverage >= 40) return shadeCoverageColors['40-50'];
+    if (coverage >= 30) return shadeCoverageColors['30-40'];
+    if (coverage >= 20) return shadeCoverageColors['20-30'];
+    if (coverage >= 10) return shadeCoverageColors['10-20'];
+    return shadeCoverageColors['0-10'];
+}
+class StreetShadeVisualizer {
+    constructor() {
+        this.heatmapLayer = null;
+        this.streetLines = []; // Array to hold street line overlays
+        this.currentTime = '08:00';
+        this.currentDate = '';
+        this.timeFieldMap = {
+            '08:00': 's_0621_08',
+            '10:00': 's_0621_10', 
+            '12:00': 's_0621_12',
+            '14:00': 's_0621_14',
+            '16:00': 's_0621_16',
+            '18:00': 's_0621_18'
+        };
+        this.dataLoaded = false;
+        this.initialized = false;
+        this.mapMoveHandler = null;
+        this.heatmapData = [];
+        this.tileCache = new Map();
+        this.zoomLevel = 11;
+        this.currentBounds = null;
+        this.lastUpdateTime = 0;
+        this.updateCooldown = 1000;
+        this.displayMode = 'heatmap'; // 'heatmap' or 'lines'
+        this.stationCenter = null; // {lng, lat} for station-based filtering
+        this.stationRadius = 1000; // 1km radius in meters
+    }
+    
+    async init() {
+        if (this.initialized) return;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/street-data/summary`);
+            const data = await response.json();
+            
+            if (data.loaded && data.total_segments > 0) {
+                this.dataLoaded = true;
+                updateStatus(`✅ Auto-loaded ${data.total_segments.toLocaleString()} street segments`);
+                
+                // Wait for AMap.HeatMap to be available
+                await this.waitForHeatMapPlugin();
+                
+                // Create heatmap immediately
+                this.createHeatmap();
+                
+                // Set up filter monitoring
+                this.setupFilterMonitoring();
+                
+                // Initial update based on current filters
+                setTimeout(() => this.updateBasedOnFilters(), 1500);
+                
+                return true;
+            } else if (data.file_exists) {
+                updateStatus(`⚠️ Data file exists but not loaded. Total segments: ${data.total_segments}`);
+            } else {
+                updateStatus('ℹ️ No street data loaded. Please upload GeoJSON file.');
+            }
+        } catch (error) {
+            console.log('Server not responding:', error.message);
+            updateStatus('❌ Server not available. Make sure server.py is running.', true);
+        }
+        
+        this.initialized = true;
+        return false;
+    }
+    
+    setupFilterMonitoring() {
+        // Monitor date and time filter changes
+        const dateFilter = document.getElementById('date-filter');
+        const timeFilter = document.getElementById('time-filter');
+        
+        if (dateFilter && timeFilter) {
+            // Store initial values
+            this.currentDate = dateFilter.value;
+            this.currentTime = timeFilter.value;
+            
+            // Add event listeners for filter changes
+            dateFilter.addEventListener('change', () => {
+                this.onFilterChange();
+            });
+            
+            timeFilter.addEventListener('change', () => {
+                this.onFilterChange();
+            });
+            
+            console.log('Filter monitoring set up');
+        }
+    }
+    
+    onFilterChange() {
+        const dateFilter = document.getElementById('date-filter');
+        const timeFilter = document.getElementById('time-filter');
+        
+        const newDate = dateFilter.value;
+        const newTime = timeFilter.value;
+        
+        // Check if we should show visualization based on date filter
+        const shouldShow = this.shouldShowHeatmap();
+        
+        console.log(`Filter change: Date=${newDate}, Time=${newTime}, ShouldShow=${shouldShow}`);
+        
+        if (shouldShow) {
+            this.currentDate = newDate;
+            this.currentTime = this.formatTimeForAPI(newTime);
+            // Use the unified update method that respects display mode
+            this.updateBasedOnFilters();
+        } else {
+            // Hide all visualizations if not June 21st
+            this.clearHeatmapData();
+            this.clearStreetLines();
+            // Reset display mode and station center
+            this.displayMode = 'heatmap';
+            this.stationCenter = null;
+            updateStatus('Street data only available for June 21st');
+        }
+    }
+    
+    isJune21st(dateString) {
+        // Check if date string represents June 21st
+        // Supports multiple formats:
+        // - "21.06.2025" (your format)
+        // - "06-21" (previous format)
+        // - "2025-06-21" (ISO format)
+        // - "June 21" (text format)
+        
+        if (!dateString) return false;
+        
+        console.log('Checking date:', dateString);
+        
+        // Check for "all" dates
+        if (dateString === 'all') return true;
+        
+        // Check for your format: "21.06.2025"
+        if (dateString.includes('21.06.')) {
+            console.log('Date matches format 21.06.yyyy');
+            return true;
+        }
+        
+        // Check for format with 21st day and June month
+        const date = this.parseDate(dateString);
+        if (date) {
+            const isJune21 = date.getMonth() === 5 && date.getDate() === 21; // June is month 5 (0-indexed)
+            console.log(`Parsed date: ${date.toDateString()}, is June 21: ${isJune21}`);
+            return isJune21;
+        }
+        
+        // Check for other common patterns
+        const lowerDate = dateString.toLowerCase();
+        if (lowerDate.includes('jun 21') || 
+            lowerDate.includes('june 21') ||
+            lowerDate.includes('21 jun') ||
+            lowerDate.includes('21 june') ||
+            lowerDate.includes('06-21') ||
+            dateString.includes('2025-06-21')) {
+            console.log('Date matches June 21st pattern');
+            return true;
+        }
+        
+        return false;
+    }
+    
+    parseDate(dateString) {
+        try {
+            // Try different date formats
+            const formats = [
+                'DD.MM.YYYY',    // 21.06.2025
+                'MM-DD',         // 06-21
+                'YYYY-MM-DD',    // 2025-06-21
+                'MM/DD/YYYY',    // 06/21/2025
+                'DD/MM/YYYY'     // 21/06/2025
+            ];
+            
+            for (const format of formats) {
+                let date;
+                
+                if (format === 'DD.MM.YYYY') {
+                    const parts = dateString.split('.');
+                    if (parts.length === 3) {
+                        const day = parseInt(parts[0]);
+                        const month = parseInt(parts[1]) - 1; // Month is 0-indexed
+                        const year = parseInt(parts[2]);
+                        date = new Date(year, month, day);
+                        if (!isNaN(date.getTime())) return date;
+                    }
+                } else if (format === 'MM-DD') {
+                    const parts = dateString.split('-');
+                    if (parts.length === 2) {
+                        const month = parseInt(parts[0]) - 1;
+                        const day = parseInt(parts[1]);
+                        const year = new Date().getFullYear();
+                        date = new Date(year, month, day);
+                        if (!isNaN(date.getTime())) return date;
+                    }
+                } else if (format === 'YYYY-MM-DD') {
+                    date = new Date(dateString);
+                    if (!isNaN(date.getTime())) return date;
+                }
+            }
+            
+            // Try native Date parsing as fallback
+            const date = new Date(dateString);
+            if (!isNaN(date.getTime())) return date;
+            
+        } catch (e) {
+            console.log('Error parsing date:', e);
+        }
+        
+        return null;
+    }
+    
+    formatTimeForAPI(timeString) {
+        // Convert time from "08:00:00" to "08:00" format
+        if (!timeString) return '08:00';
+        
+        // Remove seconds if present
+        if (timeString.includes(':')) {
+            const parts = timeString.split(':');
+            if (parts.length >= 2) {
+                return `${parts[0]}:${parts[1]}`; // Return HH:MM
+            }
+        }
+        
+        return timeString;
+    }
+    
+    shouldShowHeatmap() {
+        // Check current date filter
+        const dateFilter = document.getElementById('date-filter');
+        if (!dateFilter) return true;
+        
+        const currentDate = dateFilter.value;
+        return this.isJune21st(currentDate) || currentDate === 'all';
+    }
+    
+    async waitForHeatMapPlugin() {
+        if (typeof AMap.HeatMap === 'undefined') {
+            console.log('Loading AMap.HeatMap plugin...');
+            
+            return new Promise((resolve) => {
+                AMap.plugin(['AMap.HeatMap'], () => {
+                    console.log('AMap.HeatMap plugin loaded');
+                    resolve();
+                });
+                
+                setTimeout(() => {
+                    console.log('HeatMap plugin load timeout');
+                    resolve();
+                }, 3000);
+            });
+        }
+        return Promise.resolve();
+    }
+    
+    createHeatmap() {
+        // Remove existing heatmap
+        if (this.heatmapLayer) {
+            map.remove(this.heatmapLayer);
+            this.heatmapLayer = null;
+        }
+        
+        // Check if AMap.HeatMap is available
+        if (typeof AMap.HeatMap === 'undefined') {
+            console.error('AMap.HeatMap is not available');
+            updateStatus('❌ AMap.HeatMap plugin not loaded', true);
+            return false;
+        }
+        
+        try {
+            console.log('Creating AMap.HeatMap instance...');
+            
+            // Create heatmap
+            this.heatmapLayer = new AMap.HeatMap(map, {
+                radius: 25, // Increased radius for better visibility
+                opacity: [0, currentStreetOpacity],
+                gradient: {
+                    0.0: 'rgba(0, 0, 255, 0)',      // Blue (low shade)
+                    0.1: 'rgba(0, 100, 255, 0.3)',  // Light Blue
+                    0.2: 'rgba(0, 200, 255, 0.5)',  // Cyan
+                    0.3: 'rgba(0, 255, 200, 0.6)',  // Light Green
+                    0.4: 'rgba(100, 255, 100, 0.7)', // Green
+                    0.5: 'rgba(200, 255, 0, 0.8)',  // Yellow-Green
+                    0.6: 'rgba(255, 255, 0, 0.9)',  // Yellow
+                    0.7: 'rgba(255, 200, 0, 0.9)',  // Orange-Yellow
+                    0.8: 'rgba(255, 150, 0, 1)',    // Orange
+                    0.9: 'rgba(255, 100, 0, 1)',    // Red-Orange
+                    1.0: 'rgba(255, 0, 0, 1)'       // Red (high shade)
+                },
+                zooms: [10, 20],
+                visible: true
+            });
+            
+            console.log('HeatMap created successfully');
+            
+            // Set up map movement handler
+            this.setupMapHandlers();
+            
+            updateStatus('✅ HeatMap layer created');
+            return true;
+            
+        } catch (error) {
+            console.error('Failed to create heatmap:', error);
+            updateStatus('❌ Failed to create heatmap: ' + error.message, true);
+            return false;
+        }
+    }
+    
+    setupMapHandlers() {
+        if (this.mapMoveHandler) {
+            map.off('moveend', this.mapMoveHandler);
+            map.off('zoomend', this.mapMoveHandler);
+        }
+        
+        this.mapMoveHandler = () => {
+            const now = Date.now();
+            if (now - this.lastUpdateTime < this.updateCooldown) {
+                return; // Too soon since last update
+            }
+            
+            const newZoom = map.getZoom();
+            const newBounds = map.getBounds();
+            
+            // Only update if significant change
+            if (Math.abs(newZoom - this.zoomLevel) > 0.3 || 
+                !this.boundsEqual(this.currentBounds, newBounds)) {
+                
+                this.zoomLevel = newZoom;
+                this.currentBounds = newBounds;
+                this.lastUpdateTime = now;
+                
+                if (this.dataLoaded && this.shouldShowHeatmap()) {
+                    this.updateHeatmapByTime(this.currentTime);
+                }
+            }
+        };
+        
+        map.on('moveend', this.mapMoveHandler);
+        map.on('zoomend', this.mapMoveHandler);
+    }
+    
+    boundsEqual(b1, b2) {
+        if (!b1 || !b2) return false;
+        const ne1 = b1.getNorthEast();
+        const sw1 = b1.getSouthWest();
+        const ne2 = b2.getNorthEast();
+        const sw2 = b2.getSouthWest();
+        
+        // Compare with tolerance
+        const tolerance = 0.001;
+        return (Math.abs(ne1.lng - ne2.lng) < tolerance &&
+                Math.abs(ne1.lat - ne2.lat) < tolerance &&
+                Math.abs(sw1.lng - sw2.lng) < tolerance &&
+                Math.abs(sw1.lat - sw2.lat) < tolerance);
+    }
+    
+    async updateBasedOnFilters() {
+        if (!this.dataLoaded) return;
+        
+        // Get current time from filter
+        const timeFilter = document.getElementById('time-filter');
+        if (timeFilter) {
+            this.currentTime = this.formatTimeForAPI(timeFilter.value);
+        }
+        
+        // Update based on display mode
+        if (this.displayMode === 'lines' && this.stationCenter) {
+            await this.updateStreetLinesByStation();
+        } else {
+            // Default to heatmap mode
+            this.displayMode = 'heatmap';
+            this.clearStreetLines();
+            await this.updateHeatmapByTime(this.currentTime);
+        }
+    }
+    
+    async updateHeatmapByTime(time) {
+    if (!this.dataLoaded || !this.heatmapLayer) {
+        console.log('Cannot update: no data or no heatmap layer');
+        return;
+    }
+    
+    // Check date filter for heatmap
+    if (!this.shouldShowHeatmap()) {
+        this.clearHeatmapData();
+        return;
+    }
+    
+    this.currentTime = time;
+    const zoom = map.getZoom();
+    const bounds = map.getBounds();
+    
+    try {
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        const boundsStr = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
+        
+        console.log(`Updating heatmap: Time=${time}, Zoom=${zoom}`);
+        
+        // Calculate appropriate max points based on zoom
+        let maxPoints = this.calculateMaxPoints(zoom);
+        
+        // Request data from server
+        const response = await fetch(
+            `${API_BASE_URL}/street-heatmap-points?time=${encodeURIComponent(time)}&bounds=${boundsStr}&max=${maxPoints}`
+        );
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('Server error:', data.error);
+            updateStatus(`❌ Server error: ${data.error}`, true);
+            return;
+        }
+        
+        if (data.points && data.points.length > 0) {
+            console.log(`Received ${data.points.length} points (${data.total} total), Zero values: ${data.zero_count || 0}`);
+            
+            // Prepare points for heatmap
+            const heatmapPoints = data.points.map(p => ({
+                lng: p.lng,
+                lat: p.lat, 
+                count: p.count
+            }));
+            
+            // Store for potential re-use
+            this.heatmapData = heatmapPoints;
+            
+            // Set data to heatmap with adjusted gradient for zero values
+            this.setHeatmapData(heatmapPoints);
+            
+            // Get current date for display
+            const dateFilter = document.getElementById('date-filter');
+            const currentDate = dateFilter ? dateFilter.value : 'June 21st';
+            
+            let statusMsg = `✅ ${currentDate} ${time}: ${data.points.length.toLocaleString()} street points`;
+            if (data.zero_count > 0) {
+                statusMsg += ` (${data.zero_count} zero-shade areas)`;
+            }
+            updateStatus(statusMsg);
+            
+        } else {
+            console.log('No points in current view');
+            this.clearHeatmapData();
+            updateStatus('No street data in current view');
+        }
+        
+    } catch (error) {
+        console.error('Failed to update heatmap:', error);
+        updateStatus('❌ Failed to load street data: ' + error.message, true);
+    }
+}
+    
+    async updateStreetLinesByStation() {
+        if (!this.dataLoaded || !this.stationCenter) {
+            console.log('Cannot update street lines: no data or no station center');
+            return;
+        }
+        
+        // Check date filter
+        if (!this.shouldShowHeatmap()) {
+            this.clearStreetLines();
+            return;
+        }
+        
+        try {
+            console.log(`Updating street lines around station: ${this.stationCenter.lng}, ${this.stationCenter.lat}`);
+            
+            // Request street segments within radius from server
+            const response = await fetch(
+                `${API_BASE_URL}/street-segments?time=${encodeURIComponent(this.currentTime)}&center=${this.stationCenter.lng},${this.stationCenter.lat}&radius=${this.stationRadius}`
+            );
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                console.error('Server error:', data.error);
+                updateStatus(`❌ Server error: ${data.error}`, true);
+                return;
+            }
+            
+            if (data.segments && data.segments.length > 0) {
+                console.log(`Received ${data.segments.length} street segments`);
+                this.renderStreetLines(data.segments);
+                
+                updateStatus(`✅ ${data.segments.length} street segments around station (${this.currentTime})`);
+            } else {
+                console.log('No street segments in radius');
+                this.clearStreetLines();
+                updateStatus('No street segments in 1km radius');
+            }
+            
+        } catch (error) {
+            console.error('Failed to update street lines:', error);
+            updateStatus('❌ Failed to load street segments: ' + error.message, true);
+        }
+    }
+    
+    renderStreetLines(segments) {
+        // Clear existing lines
+        this.clearStreetLines();
+        
+        segments.forEach(segment => {
+            try {
+                // Get shade value and determine color
+                const shadeValue = segment.shade_coverage || 0;
+                const color = this.getShadeLineColor(shadeValue);
+                
+                // Transform coordinates to GCJ-02
+                const path = segment.coordinates.map(coord => {
+                    const [lng, lat] = coord;
+                    return transformWGS84ToGCJ02(lng, lat);
+                });
+                
+                // Create polyline
+                const polyline = new AMap.Polyline({
+                    path: path,
+                    strokeColor: color,
+                    strokeWeight: 4,
+                    strokeOpacity: 0.8,
+                    strokeStyle: 'solid'
+                });
+                
+                // Add to map
+                polyline.setMap(map);
+                this.streetLines.push(polyline);
+                
+            } catch (error) {
+                console.error('Error rendering street segment:', error);
+            }
+        });
+        
+        console.log(`Rendered ${this.streetLines.length} street lines`);
+    }
+    
+    getShadeLineColor(shadeValue) {
+        // Color scale for street lines (same as heatmap but more distinct)
+        const normalized = Math.max(0, Math.min(1, shadeValue / 100));
+        
+        if (normalized < 0.2) return '#ff0000'; // Red (high shade)
+        if (normalized < 0.4) return '#ff8000'; // Orange
+        if (normalized < 0.6) return '#ffff00'; // Yellow
+        if (normalized < 0.8) return '#80ff00'; // Light Green
+        return '#00ff00'; // Green (low shade)
+    }
+    
+    calculateMaxPoints(zoom) {
+        // Dynamic point count based on zoom level
+        if (zoom < 12) return 5000;     // Overview
+        if (zoom < 14) return 15000;    // City level
+        if (zoom < 16) return 30000;    // District level
+        if (zoom < 18) return 60000;    // Street level
+        return 100000;                  // Very detailed
+    }
+    
+    setHeatmapData(points) {
+        if (!this.heatmapLayer) {
+            console.log('No heatmap layer to set data');
+            return;
+        }
+        
+        console.log(`Setting ${points.length} points to heatmap`);
+        
+        try {
+            // Try setDataSet first (most common)
+            if (typeof this.heatmapLayer.setDataSet === 'function') {
+                this.heatmapLayer.setDataSet({
+                    data: points,
+                    max: 1
+                });
+                return true;
+            }
+            // Try setData
+            else if (typeof this.heatmapLayer.setData === 'function') {
+                this.heatmapLayer.setData({
+                    data: points,
+                    max: 1
+                });
+                return true;
+            }
+            // Try other methods
+            else {
+                console.warn('Standard heatmap methods not found, trying alternatives');
+                
+                // Check all methods
+                const methods = Object.keys(this.heatmapLayer)
+                    .filter(k => typeof this.heatmapLayer[k] === 'function');
+                console.log('Available methods:', methods);
+                
+                // Try common alternative names
+                for (const method of ['setData', 'setPoints', 'update', 'render']) {
+                    if (methods.includes(method)) {
+                        try {
+                            this.heatmapLayer[method]({data: points, max: 1});
+                            console.log(`Used ${method} method`);
+                            return true;
+                        } catch (e) {
+                            console.log(`${method} failed:`, e);
+                        }
+                    }
+                }
+                
+                // If nothing works, try to create new heatmap
+                console.log('Creating new heatmap with data');
+                this.createHeatmap();
+                
+                // Try again with the new instance
+                if (this.heatmapLayer && this.heatmapLayer.setDataSet) {
+                    this.heatmapLayer.setDataSet({data: points, max: 1});
+                    return true;
+                }
+                
+                throw new Error('Could not set heatmap data');
+            }
+        } catch (error) {
+            console.error('Error setting heatmap data:', error);
+            updateStatus('❌ Error updating heatmap display', true);
+            return false;
+        }
+    }
+    
+    clearHeatmapData() {
+        if (this.heatmapLayer) {
+            // Clear data by setting empty dataset
+            try {
+                if (this.heatmapLayer.setDataSet) {
+                    this.heatmapLayer.setDataSet({data: [], max: 1});
+                } else if (this.heatmapLayer.setData) {
+                    this.heatmapLayer.setData({data: [], max: 1});
+                }
+            } catch (e) {
+                console.log('Error clearing heatmap:', e);
+            }
+        }
+        this.heatmapData = [];
+        updateStatus('Street heatmap cleared (not June 21st)');
+    }
+    
+    setStationCenter(lng, lat) {
+        this.stationCenter = {lng, lat};
+        console.log(`Station center set to: ${lng}, ${lat}`);
+        
+        // Switch to line mode when station is selected
+        this.displayMode = 'lines';
+        
+        // Update visualization
+        this.updateBasedOnFilters();
+    }
+    
+    clearStationCenter() {
+        this.stationCenter = null;
+        this.displayMode = 'heatmap';
+        this.clearStreetLines();
+        this.updateBasedOnFilters();
+    }
+    
+    clearStreetLines() {
+        // Remove all street line overlays
+        this.streetLines.forEach(line => {
+            if (line && line.setMap) {
+                line.setMap(null);
+            }
+        });
+        this.streetLines = [];
+    }
+    
+    setOpacity(opacity) {
+        currentStreetOpacity = opacity;
+        if (this.heatmapLayer) {
+            // Update opacity
+            if (typeof this.heatmapLayer.setOptions === 'function') {
+                this.heatmapLayer.setOptions({
+                    opacity: [0, opacity]
+                });
+            }
+            // Re-apply data with new opacity
+            if (this.heatmapData.length > 0) {
+                this.setHeatmapData(this.heatmapData);
+            }
+        }
+    }
+    
+    clear() {
+        if (this.heatmapLayer) {
+            map.remove(this.heatmapLayer);
+            this.heatmapLayer = null;
+        }
+        
+        // Clear street lines
+        this.clearStreetLines();
+        
+        if (this.mapMoveHandler) {
+            map.off('moveend', this.mapMoveHandler);
+            map.off('zoomend', this.mapMoveHandler);
+            this.mapMoveHandler = null;
+        }
+        
+        this.dataLoaded = false;
+        this.heatmapData = [];
+        this.tileCache.clear();
+        this.stationCenter = null;
+        this.displayMode = 'heatmap';
+        updateStatus('Street visualization cleared');
+    }
+    
+    debugHeatmap() {
+        console.log('=== STREET VISUALIZER DEBUG ===');
+        console.log('Data loaded:', this.dataLoaded);
+        console.log('Initialized:', this.initialized);
+        console.log('Current time:', this.currentTime);
+        console.log('Current date:', this.currentDate);
+        console.log('Heatmap layer exists:', !!this.heatmapLayer);
+        console.log('Heatmap data points:', this.heatmapData.length);
+        
+        if (this.heatmapLayer) {
+            console.log('Heatmap layer type:', this.heatmapLayer.constructor.name);
+            console.log('Heatmap layer methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(this.heatmapLayer)));
+            
+            // Try to get current data
+            try {
+                if (this.heatmapLayer.getDataSet) {
+                    console.log('Current dataset:', this.heatmapLayer.getDataSet());
+                } else if (this.heatmapLayer.getData) {
+                    console.log('Current data:', this.heatmapLayer.getData());
+                }
+            } catch (e) {
+                console.log('Could not get current data:', e);
+            }
+        }
+        
+        // Check map bounds and zoom
+        console.log('Map zoom:', map.getZoom());
+        console.log('Map center:', map.getCenter());
+        console.log('Map bounds:', map.getBounds());
+        
+        updateStatus('Street visualizer debug info printed to console');
+    }
+}
+
+function updateStreetOpacity(value) {
+    const opacityValue = parseFloat(value);
+    const percentage = Math.round(opacityValue * 100);
+    document.getElementById('opacity-value').textContent = `${percentage}%`;
+    
+    if (streetVisualizer) {
+        streetVisualizer.setOpacity(opacityValue);
+    }
+}
+// WGS-84 to GCJ-02 coordinate transformation
+function transformWGS84ToGCJ02(lng, lat) {
+    const pi = 3.14159265358979324;
+    const a = 6378245.0;
+    const ee = 0.00669342162296594323;
+    
+    function transformLat(x, y) {
+        let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+        ret += (20.0 * Math.sin(6.0 * x * pi) + 20.0 * Math.sin(2.0 * x * pi)) * 2.0 / 3.0;
+        ret += (20.0 * Math.sin(y * pi) + 40.0 * Math.sin(y / 3.0 * pi)) * 2.0 / 3.0;
+        ret += (160.0 * Math.sin(y / 12.0 * pi) + 320 * Math.sin(y * pi / 30.0)) * 2.0 / 3.0;
+        return ret;
+    }
+    
+    function transformLon(x, y) {
+        let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+        ret += (20.0 * Math.sin(6.0 * x * pi) + 20.0 * Math.sin(2.0 * x * pi)) * 2.0 / 3.0;
+        ret += (20.0 * Math.sin(x * pi) + 40.0 * Math.sin(x / 3.0 * pi)) * 2.0 / 3.0;
+        ret += (150.0 * Math.sin(x / 12.0 * pi) + 300.0 * Math.sin(x / 30.0 * pi)) * 2.0 / 3.0;
+        return ret;
+    }
+    
+    let dLat = transformLat(lng - 105.0, lat - 35.0);
+    let dLon = transformLon(lng - 105.0, lat - 35.0);
+    const radLat = lat / 180.0 * pi;
+    let magic = Math.sin(radLat);
+    magic = 1 - ee * magic * magic;
+    const sqrtMagic = Math.sqrt(magic);
+    dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * pi);
+    dLon = (dLon * 180.0) / (a / sqrtMagic * Math.cos(radLat) * pi);
+    const mgLat = lat + dLat;
+    const mgLon = lng + dLon;
+    
+    return [mgLon, mgLat];
+}
+
+function updateSunDisplay(sunElevation, time) {
+    const mapContainer = document.getElementById('map-container');
+    
+    // Remove existing sun display
+    const existingDisplay = document.querySelector('.sun-display');
+    if (existingDisplay) {
+        existingDisplay.remove();
+    }
+    
+    // Create new sun display
+    const sunDisplay = document.createElement('div');
+    sunDisplay.className = 'sun-display';
+    
+    // Calculate sun position on arc (simplified)
+    const hour = parseInt(time.split(':')[0]);
+    const minute = parseInt(time.split(':')[1]);
+    const decimalHour = hour + minute / 60;
+    
+    // Sun position calculation (simplified for visualization)
+    const sunPositionX = ((decimalHour - 6) / 12) * 200; // 6am to 6pm
+    const sunPositionY = 80 - (sunElevation / 90) * 60; // Adjust Y based on elevation
+    
+    sunDisplay.innerHTML = `
+        <div class="sun-elevation">☀️ ${sunElevation.toFixed(1)}°</div>
+        <div class="sun-path">
+            <div class="sun-arc"></div>
+            <div class="sun-marker" style="left: ${Math.max(0, Math.min(200, sunPositionX))}px; top: ${Math.max(20, Math.min(80, sunPositionY))}px;"></div>
+        </div>
+        <div class="time-labels">
+            <span>6:00</span>
+            <span>12:00</span>
+            <span>18:00</span>
+        </div>
+        <div style="font-size: 12px; color: #666; text-align: center;">Current: ${time}</div>
+    `;
+    
+    mapContainer.appendChild(sunDisplay);
+}
+
+// Note: initMap() is defined earlier in the file (around line 668)
+// This duplicate definition has been removed to avoid conflicts
+
+function testCSVParsing(csvText) {
+    console.log('=== TESTING CSV PARSING ===');
+    const lines = csvText.split('\n');
+    const firstLine = lines[0];
+    
+    // Count semicolons vs commas
+    const semicolonCount = (firstLine.match(/;/g) || []).length;
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    
+    console.log(`Semicolons in first line: ${semicolonCount}`);
+    console.log(`Commas in first line: ${commaCount}`);
+    
+    // Parse with semicolon
+    const semicolonParts = firstLine.split(';').map(p => p.trim());
+    console.log('Semicolon split:', semicolonParts);
+    
+    // Parse with comma
+    const commaParts = firstLine.split(',').map(p => p.trim());
+    console.log('Comma split:', commaParts);
+    
+    console.log('First data line (line 2):', lines[1]);
+    const dataParts = lines[1].split(';').map(p => p.trim());
+    console.log('Data line semicolon split:', dataParts);
+    console.log('========================');
+}
+function debugCSV(csvText) {
+    console.log('=== CSV DEBUG INFO ===');
+    const lines = csvText.split('\n').filter(line => line.trim());
+    console.log('First 3 lines:');
+    for (let i = 0; i < Math.min(3, lines.length); i++) {
+        console.log(`Line ${i}: "${lines[i]}"`);
+        const parts = lines[i].split(';').map(p => p.trim()); // Use semicolon
+        console.log(`Parts (semicolon split):`, parts);
+        console.log(`Number of parts: ${parts.length}`);
+    }
+    console.log('=====================');
+}
+
+function validateAndFixCoordinates(fountainData) {
+    // Sometimes CSV files might have swapped columns
+    // Shanghai coordinates should be roughly: lon ~121.47, lat ~31.23
+    const correctedData = [];
+    let swappedCount = 0;
+    
+    fountainData.forEach(fountain => {
+        const lon = fountain.longitude;
+        const lat = fountain.latitude;
+        
+        // Check if coordinates might be swapped
+        // In Shanghai, longitude should be larger than latitude
+        if (lat > 90 || lon < -180 || lon > 180) {
+            // Definitely wrong - these can't be valid WGS84 coordinates
+            console.warn('Invalid coordinate range, skipping:', lon, lat);
+            return;
+        }
+        
+        // Check if they might be swapped (common CSV error)
+        if (lat > lon && lat < 90 && lon < 90) {
+            // Likely swapped - in Shanghai, lon should be ~121, lat should be ~31
+            console.log(`Possible swapped coordinates: ${lon}, ${lat} -> ${lat}, ${lon}`);
+            correctedData.push({
+                longitude: lat,  // Swap them
+                latitude: lon
+            });
+            swappedCount++;
+        } else {
+            correctedData.push(fountain);
+        }
+    });
+    
+    if (swappedCount > 0) {
+        console.log(`Auto-corrected ${swappedCount} swapped coordinate pairs`);
+    }
+    
+    return correctedData;
+}
+
+function showAllForSelected() {
+    if (!osmData) return;
+    
+    // Use the new function to redraw with current filters
+    redrawMetroMarkersWithCurrentFilters();
+}
+
+function processWithAlternativeColumns(lines, lonIdx, latIdx) {
+    fountainData = [];
+    let validCount = 0;
+    
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const values = line.split(',').map(v => v.trim());
+        
+        if (values.length > Math.max(lonIdx, latIdx)) {
+            const lon = parseFloat(values[lonIdx]);
+            const lat = parseFloat(values[latIdx]);
+            
+            if (!isNaN(lat) && !isNaN(lon)) {
+                fountainData.push({
+                    longitude: lon,
+                    latitude: lat
+                });
+                validCount++;
+            }
+        }
+    }
+    
+    console.log(`Loaded ${validCount} water fountains using alternative columns`);
+    updateStatus(`Loaded ${validCount} water fountain locations`);
+    updateStats(Object.keys(stations).length, markers.length, fountainData.length);
+    
+    // Show all fountains immediately
+    showAllFountains();
+}
+
+function showAllFountains() {
+    console.log('showAllFountains called, fountainData length:', fountainData.length);
+    
+    if (!fountainData || fountainData.length === 0) {
+        updateStatus('No fountain data loaded yet. Please upload fountain CSV file first.', true);
+        loadAllData();
+        return;
+    }
+    
+    // Clear existing markers
+    clearFountainMarkers();
+    
+    // Display all fountain markers
+    fountainData.forEach((fountain, index) => {
+        // Transform coordinates
+        const [transformedLng, transformedLat] = transformWGS84ToGCJ02(
+            fountain.longitude, 
+            fountain.latitude
+        );
+        
+        // Create marker
+        const markerContent = `
+            <div style="
+                font-size: 18px;
+                color: #2196F3;
+                text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                cursor: pointer;
+            " title="Water fountain - ${fountain.latitude.toFixed(6)}, ${fountain.longitude.toFixed(6)}">
+                💧
+            </div>
+        `;
+        
+        const marker = new AMap.Marker({
+            position: [transformedLng, transformedLat],
+            content: markerContent,
+            offset: new AMap.Pixel(-9, -9)
+        });
+        
+        marker.setMap(map);
+        fountainMarkers.push(marker);
+    });
+    
+    // Reset nearest fountain
+    nearestFountain = null;
+    updateNearestFountainPanel();
+    
+    // Update the all fountains panel
+    updateAllFountainsPanel();
+    
+    updateStatus(`Showing all ${fountainData.length} water fountains`);
+    
+    // Fit view to show all fountains
+    if (fountainMarkers.length > 0) {
+        map.setFitView(fountainMarkers);
+    }
+}
+
+function updateNearestFountain() {
+    if (fountainData.length === 0) return;
+    
+    const center = map.getCenter();
+    const mapCenter = { lng: center.lng, lat: center.lat };
+    
+    // Find the nearest fountain to map center
+    let nearest = null;
+    let minDistance = Infinity;
+    
+    fountainData.forEach(fountain => {
+        const distance = calculateDistance(
+            mapCenter.lat, mapCenter.lng,
+            fountain.latitude, fountain.longitude
+        );
+        
+        if (distance < minDistance) {
+            minDistance = distance;
+            nearest = {
+                ...fountain,
+                distance: distance,
+                distanceFormatted: (distance * 1000).toFixed(0) + 'm'
+            };
+        }
+    });
+    
+    nearestFountain = nearest;
+    
+    // Update the nearest fountain marker (make it larger and golden)
+    clearFountainMarkers();
+    
+    fountainData.forEach((fountain, index) => {
+        // Transform coordinates
+        const [transformedLng, transformedLat] = transformWGS84ToGCJ02(
+            fountain.longitude, 
+            fountain.latitude
+        );
+        
+        // Check if this is the nearest fountain
+        const isNearest = nearest && 
+                         fountain.latitude === nearest.latitude && 
+                         fountain.longitude === nearest.longitude;
+        
+        // Make nearest fountain larger and golden
+        const markerContent = `
+            <div style="
+                font-size: ${isNearest ? '24px' : '18px'};
+                color: ${isNearest ? '#FFD700' : '#2196F3'};
+                text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                cursor: pointer;
+            " title="${isNearest ? 'Nearest water fountain - ' + nearest.distanceFormatted : 'Water fountain'}">
+                💧
+            </div>
+        `;
+        
+        const marker = new AMap.Marker({
+            position: [transformedLng, transformedLat],
+            content: markerContent,
+            offset: isNearest ? new AMap.Pixel(-12, -12) : new AMap.Pixel(-9, -9)
+        });
+        
+        marker.setMap(map);
+        fountainMarkers.push(marker);
+    });
+    
+    // Update the nearest fountain info panel
+    updateNearestFountainPanel();
+}
+
+function updateNearestFountainPanel(stationName) {
+    const panel = document.getElementById('nearest-fountain-panel');
+    const infoDiv = document.getElementById('nearest-fountain-info');
+    
+    if (nearestFountain && stationName) {
+        panel.style.display = 'block';
+        infoDiv.innerHTML = `
+            <div class="nearest-fountain">
+                <h4>📍 Nearest to ${stationName}</h4>
+                <div class="fountain-distance">${nearestFountain.distanceFormatted}</div>
+                <div class="fountain-location">
+                    Coordinates: ${nearestFountain.latitude.toFixed(6)}, ${nearestFountain.longitude.toFixed(6)}
+                </div>
+                <p><small>Distance calculated from ${stationName}</small></p>
+            </div>
+        `;
+    } else if (nearestFountain) {
+        panel.style.display = 'block';
+        infoDiv.innerHTML = `
+            <div class="nearest-fountain">
+                <h4>📍 Nearest Water Fountain</h4>
+                <div class="fountain-distance">${nearestFountain.distanceFormatted}</div>
+                <div class="fountain-location">
+                    Coordinates: ${nearestFountain.latitude.toFixed(6)}, ${nearestFountain.longitude.toFixed(6)}
+                </div>
+                <p><small>Search for a station to see nearest fountain</small></p>
+            </div>
+        `;
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function updateAllFountainsPanel() {
+    const panel = document.getElementById('all-fountains-panel');
+    const listDiv = document.getElementById('all-fountains-list');
+    
+    if (fountainData.length > 0) {
+        panel.style.display = 'block';
+        
+        let html = `<p><strong>Total fountains loaded:</strong> ${fountainData.length}</p>`;
+        html += `<div style="max-height: 200px; overflow-y: auto;">`;
+        
+        fountainData.forEach((fountain, index) => {
+            // Calculate distance to map center if map is available
+            let distanceText = '';
+            if (map) {
+                const center = map.getCenter();
+                const distance = calculateDistance(
+                    center.lat, center.lng,
+                    fountain.latitude, fountain.longitude
+                );
+                distanceText = ` - ${(distance * 1000).toFixed(0)}m from center`;
+            }
+            
+            html += `
+                <div style="
+                    padding: 8px;
+                    margin: 4px 0;
+                    background: #F5F5F5;
+                    border-left: 4px solid #2196F3;
+                    border-radius: 4px;
+                ">
+                    <strong>💧 Fountain ${index + 1}</strong>${distanceText}
+                    <div style="font-size: 12px; color: #666;">
+                        Location: ${fountain.latitude.toFixed(6)}, ${fountain.longitude.toFixed(6)}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+        listDiv.innerHTML = html;
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in kilometers
+}
+
+
+function updateFilterControls() {
+    const dateFilter = document.getElementById('date-filter');
+    const timeFilter = document.getElementById('time-filter');
+    
+    // Clear existing options (keep "All" option)
+    while (dateFilter.children.length > 1) dateFilter.removeChild(dateFilter.lastChild);
+    while (timeFilter.children.length > 1) timeFilter.removeChild(timeFilter.lastChild);
+    
+    // Add date options
+    availableDates.forEach(date => {
+        const option = document.createElement('option');
+        option.value = date;
+        option.textContent = date;
+        dateFilter.appendChild(option);
+    });
+    
+    // Add time options
+    availableTimes.forEach(time => {
+        const option = document.createElement('option');
+        option.value = time;
+        option.textContent = time;
+        timeFilter.appendChild(option);
+    });
+    
+    // Auto-select first date and time if available
+    if (availableDates.length > 0) {
+        dateFilter.value = availableDates[0];
+        currentFilters.date = availableDates[0];
+    }
+    if (availableTimes.length > 0) {
+        timeFilter.value = availableTimes[0];
+        currentFilters.time = availableTimes[0];
+    }
+}
+
+function showAllBenches() {
+    console.log('showAllBenches called, benchData length:', benchData.length);
+    
+    if (!benchData || benchData.length === 0) {
+        updateStatus('No bench data loaded yet. Please upload bench CSV file first.', true);
+        loadAllData();
+        return;
+    }
+    
+    // Clear existing bench markers
+    clearBenchMarkers();
+    
+    // Display all bench markers
+    benchData.forEach((bench, index) => {
+        const [transformedLng, transformedLat] = transformWGS84ToGCJ02(
+            bench.longitude, 
+            bench.latitude
+        );
+        
+        const markerContent = `
+            <div style="
+                font-size: 18px;
+                color: #4CAF50;
+                text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                cursor: pointer;
+            " title="Bench - ${bench.latitude.toFixed(6)}, ${bench.longitude.toFixed(6)}">
+                🪑
+            </div>
+        `;
+        
+        const marker = new AMap.Marker({
+            position: [transformedLng, transformedLat],
+            content: markerContent,
+            offset: new AMap.Pixel(-9, -9)
+        });
+        
+        marker.setMap(map);
+        benchMarkers.push(marker);
+    });
+    
+    // Reset nearest bench
+    nearestBench = null;
+    updateNearestBenchPanel();
+    
+    // Update the all benches panel
+    updateAllBenchesPanel();
+    
+    updateStatus(`Showing all ${benchData.length} benches`);
+    
+    // Fit view to show all benches
+    if (benchMarkers.length > 0) {
+        map.setFitView(benchMarkers);
+    }
+}
+
+function clearBenchMarkers() {
+    benchMarkers.forEach(marker => marker.setMap(null));
+    benchMarkers = [];
+}
+
+function updateNearestBenchToStation(stationLng, stationLat, stationName) {
+    if (benchData.length === 0) return;
+    
+    // Find the nearest bench to the station
+    let nearest = null;
+    let minDistance = Infinity;
+    
+    benchData.forEach(bench => {
+        const distance = calculateDistance(
+            stationLat, stationLng,
+            bench.latitude, bench.longitude
+        );
+        
+        if (distance < minDistance) {
+            minDistance = distance;
+            nearest = {
+                ...bench,
+                distance: distance,
+                distanceFormatted: (distance * 1000).toFixed(0) + 'm'
+            };
+        }
+    });
+    
+    nearestBench = nearest;
+    
+    // Update bench markers with nearest highlighted
+    updateBenchMarkersForStation(stationLng, stationLat, stationName);
+    
+    // Update the nearest bench info panel
+    updateNearestBenchPanel(stationName);
+}
+
+function updateBenchMarkersForStation(stationLng, stationLat, stationName) {
+    clearBenchMarkers();
+    
+    if (benchData.length === 0) return;
+    
+    benchData.forEach((bench, index) => {
+        const [transformedLng, transformedLat] = transformWGS84ToGCJ02(
+            bench.longitude, 
+            bench.latitude
+        );
+        
+        const distance = calculateDistance(
+            stationLat, stationLng,
+            bench.latitude, bench.longitude
+        );
+        const distanceFormatted = (distance * 1000).toFixed(0) + 'm';
+        
+        const isNearest = nearestBench && 
+                         bench.latitude === nearestBench.latitude && 
+                         bench.longitude === nearestBench.longitude;
+        
+        const markerContent = `
+            <div style="
+                font-size: ${isNearest ? '24px' : '18px'};
+                color: ${isNearest ? '#FF5722' : '#4CAF50'};
+                text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                cursor: pointer;
+            " title="${isNearest ? 'Nearest bench to ' + stationName + ' - ' + distanceFormatted : 'Bench - ' + distanceFormatted + ' from ' + stationName}">
+                🪑
+            </div>
+        `;
+        
+        const marker = new AMap.Marker({
+            position: [transformedLng, transformedLat],
+            content: markerContent,
+            offset: isNearest ? new AMap.Pixel(-12, -12) : new AMap.Pixel(-9, -9)
+        });
+        
+        marker.setMap(map);
+        benchMarkers.push(marker);
+    });
+}
+
+function updateNearestBenchPanel(stationName) {
+    const panel = document.getElementById('nearest-bench-panel');
+    const infoDiv = document.getElementById('nearest-bench-info');
+    
+    if (nearestBench && stationName) {
+        panel.style.display = 'block';
+        infoDiv.innerHTML = `
+            <div class="nearest-fountain" style="border-left-color: #4CAF50;">
+                <h4>📍 Nearest to ${stationName}</h4>
+                <div class="fountain-distance" style="color: #4CAF50;">${nearestBench.distanceFormatted}</div>
+                <div class="fountain-location">
+                    Coordinates: ${nearestBench.latitude.toFixed(6)}, ${nearestBench.longitude.toFixed(6)}
+                </div>
+                <p><small>Distance calculated from ${stationName}</small></p>
+            </div>
+        `;
+    } else if (nearestBench) {
+        panel.style.display = 'block';
+        infoDiv.innerHTML = `
+            <div class="nearest-fountain" style="border-left-color: #4CAF50;">
+                <h4>📍 Nearest Bench</h4>
+                <div class="fountain-distance" style="color: #4CAF50;">${nearestBench.distanceFormatted}</div>
+                <div class="fountain-location">
+                    Coordinates: ${nearestBench.latitude.toFixed(6)}, ${nearestBench.longitude.toFixed(6)}
+                </div>
+                <p><small>Search for a station to see nearest bench</small></p>
+            </div>
+        `;
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function updateAllBenchesPanel() {
+    const panel = document.getElementById('all-benches-panel');
+    const listDiv = document.getElementById('all-benches-list');
+    
+    if (benchData.length > 0) {
+        panel.style.display = 'block';
+        
+        let html = `<p><strong>Total benches loaded:</strong> ${benchData.length}</p>`;
+        html += `<div style="max-height: 200px; overflow-y: auto;">`;
+        
+        benchData.forEach((bench, index) => {
+            let distanceText = '';
+            if (map) {
+                const center = map.getCenter();
+                const distance = calculateDistance(
+                    center.lat, center.lng,
+                    bench.latitude, bench.longitude
+                );
+                distanceText = ` - ${(distance * 1000).toFixed(0)}m from center`;
+            }
+            
+            html += `
+                <div style="
+                    padding: 8px;
+                    margin: 4px 0;
+                    background: #F5F5F5;
+                    border-left: 4px solid #4CAF50;
+                    border-radius: 4px;
+                ">
+                    <strong>🪑 Bench ${index + 1}</strong>${distanceText}
+                    <div style="font-size: 12px; color: #666;">
+                        Location: ${bench.latitude.toFixed(6)}, ${bench.longitude.toFixed(6)}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+        listDiv.innerHTML = html;
+    } else {
+        panel.style.display = 'none';
+    }
+}
+// Replace the applyFilters() function temporarily with this:
+function applyFilters() {
+    const dateFilter = document.getElementById('date-filter');
+    const timeFilter = document.getElementById('time-filter');
+    
+    currentFilters.date = dateFilter.value;
+    currentFilters.time = timeFilter.value;
+    
+    console.log('Applying filters:', currentFilters);
+    
+    // TEMPORARY: Show ALL data regardless of filters
+    redrawMetroMarkersWithCurrentFilters(true);
+    
+    updateDataInfo(`Showing data for: ${currentFilters.date} at ${currentFilters.time}`);
+}
+
+/* Old applyFilters() function for reference
+function applyFilters() {
+    const dateFilter = document.getElementById('date-filter');
+    const timeFilter = document.getElementById('time-filter');
+    
+    currentFilters.date = dateFilter.value;
+    currentFilters.time = timeFilter.value;
+    
+    // Update sun display when filters change
+    if (currentFilters.date !== 'all' && currentFilters.time !== 'all') {
+        const sampleStation = Object.values(osmData)[0];
+        if (sampleStation && sampleStation.exits.length > 0) {
+            const sampleExit = sampleStation.exits[0];
+            const timeData = sampleExit.timeData.find(data => 
+                data.date === currentFilters.date && data.time === currentFilters.time
+            );
+            if (timeData) {
+                currentSunElevation = timeData.sun_elevation;
+                currentTime = currentFilters.time;
+                updateSunDisplay(currentSunElevation, currentTime);
+            }
+        }
+    }
+    
+    // Update street heatmap based on filters
+    if (streetVisualizer && streetVisualizer.dataLoaded) {
+        // Format time correctly (remove seconds if present)
+        let formattedTime = currentFilters.time;
+        if (formattedTime.includes(':')) {
+            const parts = formattedTime.split(':');
+            if (parts.length >= 2) {
+                formattedTime = `${parts[0]}:${parts[1]}`;
+            }
+        }
+        
+        // Check if date is June 21st
+        const isJune21 = streetVisualizer.isJune21st(currentFilters.date);
+        
+        if (isJune21 || currentFilters.date === 'all') {
+            streetVisualizer.updateHeatmapByTime(formattedTime);
+        } else {
+            streetVisualizer.clearHeatmapData();
+            updateStatus('Street data only available for June 21st');
+        }
+    }
+    
+    // CRITICAL FIX: Redraw metro exit markers with new filters
+    redrawMetroMarkersWithCurrentFilters();
+    
+    updateDataInfo(`Showing data for: ${currentFilters.date} at ${currentFilters.time}`);
+}*/
+
+// New function to redraw metro markers with current filters
+function redrawMetroMarkersWithCurrentFilters() {
+    // Clear existing markers (but NOT the heatmap)
+    markers.forEach(marker => marker.setMap(null));
+    markers = [];
+    
+    // Also clear fountain and bench markers
+    clearFountainMarkers();
+    clearBenchMarkers();
+    
+    // Reset nearest markers
+    nearestFountain = null;
+    nearestBench = null;
+    updateNearestFountainPanel();
+    updateNearestBenchPanel();
+    
+    if (!osmData) {
+        updateStatus('No metro data loaded');
+        return;
+    }
+    
+    let exitCount = 0;
+    let stationCount = 0;
+    const stationsWithData = [];
+    
+    // Redraw all stations/exits with current filters
+    Object.values(osmData).forEach(station => {
+        let stationHasData = false;
+        
+        station.exits.forEach(exit => {
+            // Find time data matching current filters
+            const timeData = exit.timeData.find(data => 
+                (currentFilters.date === 'all' || data.date === currentFilters.date) &&
+                (currentFilters.time === 'all' || data.time === currentFilters.time)
+            );
+            
+            if (timeData) {
+                // Color by shade coverage
+                const color = getShadeCoverageColor(timeData.shade_coverage);
+
+                addExitMarker(
+                    exit.longitude, 
+                    exit.latitude, 
+                    exit.exit_number, 
+                    station.name,
+                    color,
+                    timeData.sun_elevation,
+                    timeData.in_sunlight,
+                    timeData.date,
+                    timeData.time,
+                    timeData.shade_coverage
+                );
+                
+                exitCount++;
+                stationHasData = true;
+            }
+        });
+        
+        // Add station marker if any exits were added
+        if (stationHasData) {
+            const firstExit = station.exits[0];
+            addStationMarker(firstExit.longitude, firstExit.latitude, station.name, station.exits.length);
+            stationsWithData.push(station.name);
+            stationCount++;
+        }
+    });
+    
+    // Update stats
+    updateStats(stationCount, exitCount, fountainData.length, benchData.length);
+    
+    if (exitCount > 0) {
+        updateStatus(`Showing ${exitCount} metro exits from ${stationCount} stations for ${currentFilters.date} at ${currentFilters.time}`);
+        
+        // Auto-zoom to show all markers if we have many
+        if (markers.length > 0 && markers.length < 100) {
+            setTimeout(() => map.setFitView(), 500);
+        }
+    } else {
+        updateStatus(`No metro data for ${currentFilters.date} at ${currentFilters.time}`);
+    }
+    
+    // Update station list to reflect filtered data
+    //updateStationListWithFilter(stationsWithData);
+}
+
+// Update the station list to show only stations with data for current filters
+function updateStationListWithFilter(stationNames) {
+    const stationList = document.getElementById('station-list');
+    
+    if (!stationNames || stationNames.length === 0) {
+        stationList.innerHTML = '<p>No stations match current filters</p>';
+        return;
+    }
+    
+    let html = `<p><strong>Stations with data for current filters (${stationNames.length}):</strong></p>`;
+    
+    stationNames.forEach(stationName => {
+        const station = osmData[stationName];
+        if (station) {
+            html += `
+                <div class="station-item" onclick="zoomToStation('${stationName}')">
+                    <strong>${stationName}</strong>
+                    <span class="exit-count">${station.exits.length} exits</span>
+                </div>
+            `;
+        }
+    });
+    
+    stationList.innerHTML = html;
+}
+
+function searchStation() {
+    const query = document.getElementById('station-search').value.trim().toLowerCase();
+    if (!query) return;
+    
+    // Clear existing markers but keep heatmap
+    markers.forEach(marker => marker.setMap(null));
+    markers = [];
+    
+    if (!osmData) {
+        updateStatus('No data loaded. Please load your CSV file first.', true);
+        return;
+    }
+    
+    const results = Object.values(osmData).filter(station => 
+        station.name.toLowerCase().includes(query)
+    );
+    
+    if (results.length === 0) {
+        updateStatus(`No stations found for "${query}"`, true);
+        return;
+    }
+    
+    let exitCount = 0;
+    
+    results.forEach(station => {
+        station.exits.forEach(exit => {
+            // Find time data matching current filters
+            const timeData = exit.timeData.find(data => 
+                (currentFilters.date === 'all' || data.date === currentFilters.date) &&
+                (currentFilters.time === 'all' || data.time === currentFilters.time)
+            );
+            
+            if (timeData) {
+                const color = getShadeCoverageColor(timeData.shade_coverage);
+                
+                addExitMarker(
+                    exit.longitude, 
+                    exit.latitude, 
+                    exit.exit_number, 
+                    station.name,
+                    color,
+                    timeData.sun_elevation,
+                    timeData.in_sunlight,
+                    timeData.date,
+                    timeData.time,
+                    timeData.shade_coverage
+                );
+                exitCount++;
+            }
+        });
+        
+        // Add station marker if any exits were added
+        if (station.exits.some(exit => 
+            exit.timeData.some(data => 
+                (currentFilters.date === 'all' || data.date === currentFilters.date) &&
+                (currentFilters.time === 'all' || data.time === currentFilters.time)
+            )
+        )) {
+            const firstExit = station.exits[0];
+            addStationMarker(firstExit.longitude, firstExit.latitude, station.name, station.exits.length);
+        }
+    });
+    
+    updateStatus(`Found ${results.length} stations with ${exitCount} exits matching "${query}" and current filters`);
+    
+    // Zoom to first result
+    if (results.length > 0 && exitCount > 0) {
+        const firstStation = results[0];
+        if (firstStation.exits.length > 0) {
+            const firstExit = firstStation.exits[0];
+            // Transform coordinates for panning
+            const [transformedLng, transformedLat] = transformWGS84ToGCJ02(firstExit.longitude, firstExit.latitude);
+            map.setZoom(15);
+            map.panTo([transformedLng, transformedLat]);
+            showStationInfo(firstStation);
+
+            updateNearestFountainToStation(firstExit.longitude, firstExit.latitude, firstStation.name);
+            updateNearestBenchToStation(firstExit.longitude, firstExit.latitude, firstStation.name);
+        }
+    }
+}
+
+function updateNearestFountainToStation(stationLng, stationLat, stationName) {
+    if (fountainData.length === 0) return;
+    
+    // Find the nearest fountain to the station
+    let nearest = null;
+    let minDistance = Infinity;
+    
+    fountainData.forEach(fountain => {
+        const distance = calculateDistance(
+            stationLat, stationLng,
+            fountain.latitude, fountain.longitude
+        );
+        
+        if (distance < minDistance) {
+            minDistance = distance;
+            nearest = {
+                ...fountain,
+                distance: distance,
+                distanceFormatted: (distance * 1000).toFixed(0) + 'm'
+            };
+        }
+    });
+    
+    nearestFountain = nearest;
+    
+    // Update fountain markers with nearest highlighted
+    updateFountainMarkersForStation(stationLng, stationLat, stationName);
+	
+    
+    // Update the nearest fountain info panel
+    updateNearestFountainPanel(stationName);
+}
+
+function updateFountainMarkersForStation(stationLng, stationLat, stationName) {
+    clearFountainMarkers();
+    
+    if (fountainData.length === 0) return;
+    
+    // Display all fountain markers
+    fountainData.forEach((fountain, index) => {
+        // Transform coordinates
+        const [transformedLng, transformedLat] = transformWGS84ToGCJ02(
+            fountain.longitude, 
+            fountain.latitude
+        );
+        
+        // Calculate distance to station
+        const distance = calculateDistance(
+            stationLat, stationLng,
+            fountain.latitude, fountain.longitude
+        );
+        const distanceFormatted = (distance * 1000).toFixed(0) + 'm';
+        
+        // Check if this is the nearest fountain
+        const isNearest = nearestFountain && 
+                         fountain.latitude === nearestFountain.latitude && 
+                         fountain.longitude === nearestFountain.longitude;
+        
+        // Make nearest fountain larger and golden
+        const markerContent = `
+            <div style="
+                font-size: ${isNearest ? '24px' : '18px'};
+                color: ${isNearest ? '#FFD700' : '#2196F3'};
+                text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                cursor: pointer;
+            " title="${isNearest ? 'Nearest water fountain to ' + stationName + ' - ' + distanceFormatted : 'Water fountain - ' + distanceFormatted + ' from ' + stationName}">
+                💧
+            </div>
+        `;
+        
+        const marker = new AMap.Marker({
+            position: [transformedLng, transformedLat],
+            content: markerContent,
+            offset: isNearest ? new AMap.Pixel(-12, -12) : new AMap.Pixel(-9, -9)
+        });
+        
+        marker.setMap(map);
+        fountainMarkers.push(marker);
+    });
+}
+
+function addStationMarkers(station) {
+    station.exits.forEach(exit => {
+        // Find time data matching current filters
+        const timeData = exit.timeData.find(data => 
+            (currentFilters.date === 'all' || data.date === currentFilters.date) &&
+            (currentFilters.time === 'all' || data.time === currentFilters.time)
+        );
+        
+        if (timeData) {
+            // Color by shade coverage instead of sun elevation
+            const color = getShadeCoverageColor(timeData.shade_coverage);
+            
+            addExitMarker(
+                exit.longitude, 
+                exit.latitude, 
+                exit.exit_number, 
+                station.name,
+                color,
+                timeData.sun_elevation,
+                timeData.in_sunlight,
+                timeData.date,
+                timeData.time,
+                timeData.shade_coverage
+            );
+        }
+    });
+    
+    // Add station marker if any exits were added
+    if (station.exits.some(exit => 
+        exit.timeData.some(data => 
+            (currentFilters.date === 'all' || data.date === currentFilters.date) &&
+            (currentFilters.time === 'all' || data.time === currentFilters.time)
+        )
+    )) {
+        const firstExit = station.exits[0];
+        addStationMarker(firstExit.longitude, firstExit.latitude, station.name, station.exits.length);
+    }
+}
+
+function addStationMarker(lng, lat, stationName, exitCount) {
+    // Transform coordinates
+    const [transformedLng, transformedLat] = transformWGS84ToGCJ02(lng, lat);
+    
+    // Smaller station marker
+    const markerContent = `
+        <div style="
+            background-color: #FF5722; 
+            color: white; 
+            width: 20px; 
+            height: 20px; 
+            border-radius: 50%; 
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: pointer;
+        " title="${stationName} (${exitCount} exits)">
+            🚇
+        </div>
+    `;
+    
+    const marker = new AMap.Marker({
+        position: [transformedLng, transformedLat],
+        content: markerContent,
+        offset: new AMap.Pixel(-10, -10)
+    });
+    
+    marker.setMap(map);
+    markers.push(marker);
+    
+    marker.on('click', function() {
+        zoomToStation(stationName);
+    });
+}
+
+function addExitMarker(lng, lat, exitNumber, stationName, color, sunElevation, inSunlight, date, time, shadeCoverage) {
+    // Transform coordinates from WGS-84 to GCJ-02
+    const [transformedLng, transformedLat] = transformWGS84ToGCJ02(lng, lat);
+    
+    const markerContent = `
+        <div style="
+            position: relative; 
+            display: inline-block;
+        ">
+            <div style="
+                background-color: ${color}; 
+                color: ${shadeCoverage > 50 ? 'white' : 'black'}; 
+                padding: 6px 10px; 
+                border-radius: 12px; 
+                border: 2px solid white;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                font-size: 11px;
+                font-weight: bold;
+                white-space: nowrap;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            " 
+            onmouseover="this.parentNode.querySelector('.shade-badge').style.display='block'" 
+            onmouseout="this.parentNode.querySelector('.shade-badge').style.display='none'"
+            title="${stationName} - ${exitNumber} | Shade: ${shadeCoverage}% | Sun: ${sunElevation.toFixed(1)}° | ${date} ${time}">
+                ${exitNumber}
+            </div>
+            <div class="shade-badge" style="
+                display: none;
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                background: #333;
+                color: white;
+                border-radius: 10px;
+                padding: 2px 6px;
+                font-size: 9px;
+                font-weight: bold;
+                border: 1px solid white;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+                z-index: 10;
+                min-width: 20px;
+                text-align: center;
+            ">${shadeCoverage}%</div>
+        </div>
+    `;
+    
+    const marker = new AMap.Marker({
+        position: [transformedLng, transformedLat],
+        content: markerContent,
+        offset: new AMap.Pixel(-15, -8)
+    });
+    
+    marker.setMap(map);
+    markers.push(marker);
+    
+    marker.on('click', function() {
+        showExitDetails(exitNumber, stationName, lng, lat, sunElevation, inSunlight, date, time, shadeCoverage);
+    });
+}
+
+function zoomToStation(stationName) {
+    const station = osmData[stationName];
+    if (station && station.exits.length > 0) {
+        const firstExit = station.exits[0];
+        // Transform coordinates for panning
+        const [transformedLng, transformedLat] = transformWGS84ToGCJ02(firstExit.longitude, firstExit.latitude);
+        map.setZoom(16);
+        map.panTo([transformedLng, transformedLat]);
+        
+        // Set station center for precise street visualization
+        if (streetVisualizer) {
+            streetVisualizer.setStationCenter(firstExit.longitude, firstExit.latitude);
+        }
+        
+        showStationInfo(station);
+        updateStatus(`Zoomed to ${stationName} - showing street shade lines within 1km`);
+    }
+}
+
+function showStationInfo(station) {
+    const infoDiv = document.getElementById('station-info');
+    let html = `
+        <h4>${station.name}</h4>
+        <p><strong>Number of exits:</strong> ${station.exits.length}</p>
+        <p><strong>Current filters:</strong> ${currentFilters.date} at ${currentFilters.time}</p>
+        <div style="max-height: 300px; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #f8f9fa;">
+                        <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Exit</th>
+                        <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Shade Coverage</th>
+                        <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Sun Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    station.exits.forEach(exit => {
+        const timeData = exit.timeData.find(data => 
+            (currentFilters.date === 'all' || data.date === currentFilters.date) &&
+            (currentFilters.time === 'all' || data.time === currentFilters.time)
+        );
+        
+        if (timeData) {
+            const status = timeData.in_sunlight ? 'In Sunlight' : 'In Shade';
+            const statusColor = timeData.in_sunlight ? '#4CAF50' : '#666';
+            html += `
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${exit.exit_number}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">
+                        <span style="color: ${getShadeCoverageColor(timeData.shade_coverage)}; font-weight: bold;">
+                            ${timeData.shade_coverage}%
+                        </span>
+                    </td>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">
+                        <span style="color: ${statusColor}; font-weight: bold;">
+                            ${status}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }
+    });
+    
+    html += `</tbody></table></div>`;
+    infoDiv.innerHTML = html;
+}
+
+function showExitDetails(exitNumber, stationName, lng, lat, sunElevation, inSunlight, date, time, shadeCoverage) {
+    const infoDiv = document.getElementById('station-info');
+    const sunlightStatus = inSunlight ? 'In Direct Sunlight' : 'In Shade';
+    
+    infoDiv.innerHTML = `
+        <h4>${stationName} - ${exitNumber}</h4>
+        <p><strong>Shade Coverage:</strong> 
+            <span style="color: ${getShadeCoverageColor(shadeCoverage)}; font-weight: bold;">
+                ${shadeCoverage}% (from buildings)
+            </span>
+        </p>
+        <p><strong>Sun Status:</strong> 
+            <span style="color: ${inSunlight ? '#4CAF50' : '#666'}; font-weight: bold;">
+                ${sunlightStatus}
+            </span>
+        </p>
+        <p><strong>Sun Elevation:</strong> ${sunElevation.toFixed(1)}°</p>
+        <p><strong>Date/Time:</strong> ${date} ${time}</p>
+        <p><strong>Location:</strong> ${lng.toFixed(6)}, ${lat.toFixed(6)}</p>
+    `;
+    
+    // Transform coordinates for panning
+    const [transformedLng, transformedLat] = transformWGS84ToGCJ02(lng, lat);
+    map.setZoom(17);
+    map.panTo([transformedLng, transformedLat]);
+}
+
+function updateStationList() {
+    const stationList = document.getElementById('station-list');
+    
+    if (!osmData || Object.keys(osmData).length === 0) {
+        stationList.innerHTML = '<p>No stations loaded</p>';
+        return;
+    }
+    
+    let html = '';
+    Object.values(osmData).forEach(station => {
+        html += `
+            <div class="station-item" onclick="zoomToStation('${station.name}')">
+                <strong>${station.name}</strong>
+                <span class="exit-count">${station.exits.length} exits</span>
+            </div>
+        `;
+    });
+    
+    stationList.innerHTML = html;
+}
+
+function clearMap() {
+    // This function should only be used for manual clearing
+    // NOT for filter changes
+    
+    markers.forEach(marker => marker.setMap(null));
+    markers = [];
+    clearFountainMarkers();
+    clearBenchMarkers();
+    nearestFountain = null;
+    nearestBench = null;
+    updateNearestFountainPanel();
+    updateNearestBenchPanel();
+    
+    // Clear street visualization if requested
+    if (streetVisualizer) {
+        streetVisualizer.clear();
+    }
+    
+    // Clear station list
+    document.getElementById('station-list').innerHTML = '<p>Map cleared</p>';
+    
+    updateStatus('Map cleared');
+}
+
+function clearFountainMarkers() {
+    fountainMarkers.forEach(marker => marker.setMap(null));
+    fountainMarkers = [];
+}
+
+function updateStats(stationCount, exitCount, fountainCount = 0, benchCount = 0) {
+    document.getElementById('stats-stations').textContent = `Stations: ${stationCount}`;
+    document.getElementById('stats-exits').textContent = `Exits: ${exitCount}`;
+    document.getElementById('stats-fountains').textContent = `Fountains: ${fountainCount}`;
+document.getElementById('stats-benches').textContent = `Benches: ${benchCount}`;
+}
+
+function updateStatus(message, isError = false) {
+    const statusElement = document.getElementById('stats-loaded');
+    statusElement.textContent = `Status: ${message}`;
+    statusElement.style.color = isError ? 'red' : 'green';
+    console.log(message);
+}
+
+function updateDataInfo(message) {
+    document.getElementById('data-info').innerHTML = `<p>${message}</p>`;
+}
+
+// Initialize map when page loads
+window.onload = initMap;
+    </script>
+</body>
+</html>

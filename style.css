@@ -1,0 +1,146 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+h1 {
+    color: #333;
+    text-align: center;
+}
+
+.search-box {
+    text-align: center;
+    margin: 20px 0;
+}
+
+#station-search {
+    padding: 10px;
+    width: 300px;
+    font-size: 16px;
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+buttonhover {
+    background-color: #45a049;
+}
+
+#map-container {
+    width: 100%;
+    height: 500px;
+    margin: 20px 0;
+    border: 2px solid #ddd;
+}
+
+#station-info {
+    background-color: white;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Add these to your existing CSS file */
+
+/* Better polygon hover effect */
+.amap-polygon {
+    transition: fill-opacity 0.2s ease, stroke-width 0.2s ease;
+}
+
+.amap-polygon:hover {
+    stroke-width: 3px !important;
+    fill-opacity: 0.7 !important;
+}
+
+/* Time of day visualization bars */
+.hour-bar {
+    transition: height 0.3s ease, background-color 0.3s ease;
+}
+
+.hour-bar:hover {
+    opacity: 0.8;
+    transform: scaleY(1.1);
+}
+
+/* Better info window styling */
+.amap-info-content {
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+/* Comfort level indicators */
+.comfort-indicator {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    display: inline-block;
+    margin: 2px;
+    font-weight: bold;
+}
+
+.comfort-very-comfortable {
+    background-color: #E8F5E9;
+    color: #2E7D32;
+}
+
+.comfort-comfortable {
+    background-color: #F1F8E9;
+    color: #558B2F;
+}
+
+.comfort-moderate {
+    background-color: #FFF3E0;
+    color: #EF6C00;
+}
+
+.comfort-uncomfortable {
+    background-color: #FFEBEE;
+    color: #C62828;
+}
+
+.comfort-very-uncomfortable {
+    background-color: #FCE4EC;
+    color: #AD1457;
+}
+
+/* ✅ NEEDED - For heatmap visualization controls */
+.heatmap-controls {
+    background: rgba(255, 255, 255, 0.9);
+    padding: 10px;
+    border-radius: 5px;
+    margin: 10px 0;
+}
+
+.heatmap-slider {
+    width: 100%;
+    margin: 5px 0;
+}
+
+/* ✅ OPTIONAL - For better performance with many polygons */
+.simplified-polygon {
+    vector-effect: non-scaling-stroke;
+}
+
+/* Performance warning */
+.performance-warning {
+    background: #FFF3CD;
+    border: 1px solid #FFECB5;
+    color: #856404;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 10px 0;
+    font-size: 14px;
+}
