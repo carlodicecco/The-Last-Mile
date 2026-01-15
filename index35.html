@@ -1188,6 +1188,17 @@ async function loadStreetDataOnce() {
             streetVisualizer.dataLoaded = true;
         }
         
+        // ===== TRIGGER HEATMAP REFRESH IMMEDIATELY AFTER LOADING =====
+        if (streetVisualizer) {
+            console.log('🔄 Triggering heatmap refresh with newly loaded GeoJSON');
+            // Get current time filter value
+            const timeFilter = document.getElementById('time-filter');
+            const currentTime = timeFilter ? streetVisualizer.formatTimeForAPI(timeFilter.value) : '08:00';
+            
+            // Immediately update heatmap with fresh data
+            await streetVisualizer.updateHeatmapByTime(currentTime);
+        }
+        
         return true;
         
     } catch (error) {
@@ -1686,31 +1697,58 @@ class StreetShadeVisualizer {
         
         console.log(`Filtered ${featuresInView.length} features in view from ${window.fullGeoJSON.features.length} total`);
         
-        // Extract points with shade values for the selected time
+        // ===== REFACTORED: Work with raw GeoJSON features =====
+        // Extract shade property key with proper time formatting
+        const hour = time.split(':')[0].padStart(2, '0');
+        const propertyKey = `s_0621_${hour}`;
+        
+        console.log(`Using property key: ${propertyKey}`);
+        
+        // Transform raw GeoJSON features to heatmap points
         const heatmapPoints = [];
         let zeroCount = 0;
+        let validCount = 0;
         
         featuresInView.forEach(feature => {
             if (!feature.geometry || feature.geometry.type !== 'LineString') return;
             
-            const shadeValue = getShadeValueForTime(feature, time);
+            // Extract shade value from feature properties
+            const shadeValue = feature.properties && feature.properties[propertyKey] !== undefined
+                ? parseFloat(feature.properties[propertyKey])
+                : null;
+            
             if (shadeValue === null) return;
             
-            if (shadeValue === 0) zeroCount++;
+            // Only include points with count > 0 for performance
+            if (shadeValue <= 0) {
+                zeroCount++;
+                return;
+            }
             
-            // Convert LineString coordinates to heatmap points
+            validCount++;
+            
+            // Iterate through feature coordinates
+            // GeoJSON format: coordinates are [longitude, latitude]
             const coords = feature.geometry.coordinates;
-            coords.forEach(([lng, lat]) => {
+            coords.forEach(coord => {
+                // Extract lng (index 0) and lat (index 1)
+                const lng = coord[0];
+                const lat = coord[1];
+                
                 // Transform to GCJ-02
                 const [gcjLng, gcjLat] = transformWGS84ToGCJ02(lng, lat);
                 
+                // Create heatmap point with proper data transformation
+                // Normalize shade value: divide by 36 as per requirement
                 heatmapPoints.push({
-                    lng: gcjLng,
                     lat: gcjLat,
-                    count: Math.max(shadeValue, 0.1) // Ensure minimum visibility
+                    lng: gcjLng,
+                    count: shadeValue / 36
                 });
             });
         });
+        
+        console.log(`Extracted ${validCount} features with valid shade data, ${zeroCount} skipped`);
         
         // Limit points if needed
         let finalPoints = heatmapPoints;
@@ -1725,7 +1763,7 @@ class StreetShadeVisualizer {
             // Store for potential re-use
             this.heatmapData = finalPoints;
             
-            // Set data to heatmap
+            // Set data to heatmap with properly formatted array
             this.setHeatmapData(finalPoints);
             
             // Get current date for display
@@ -1739,7 +1777,7 @@ class StreetShadeVisualizer {
             updateStatus(statusMsg);
             
         } else {
-            console.log('No points in current view');
+            console.log('No points with shade coverage in current view');
             this.clearHeatmapData();
             updateStatus('No street data in current view');
         }
@@ -1880,22 +1918,30 @@ class StreetShadeVisualizer {
         }
         
         console.log(`Setting ${points.length} points to heatmap`);
+        console.log('Sample point format:', points.length > 0 ? points[0] : 'no points');
         
         try {
-            // Try setDataSet first (most common)
+            // Ensure points are in correct format: {lat, lng, count}
+            const formattedPoints = points.map(p => ({
+                lat: p.lat,
+                lng: p.lng,
+                count: p.count || 0
+            }));
+            
+            // Try setDataSet first (AMap HeatMap API)
             if (typeof this.heatmapLayer.setDataSet === 'function') {
                 this.heatmapLayer.setDataSet({
-                    data: points,
-                    max: 1
+                    data: formattedPoints
                 });
+                console.log('Successfully set heatmap data via setDataSet');
                 return true;
             }
-            // Try setData
+            // Try setData (alternative API)
             else if (typeof this.heatmapLayer.setData === 'function') {
                 this.heatmapLayer.setData({
-                    data: points,
-                    max: 1
+                    data: formattedPoints
                 });
+                console.log('Successfully set heatmap data via setData');
                 return true;
             }
             // Try other methods
@@ -1911,8 +1957,8 @@ class StreetShadeVisualizer {
                 for (const method of ['setData', 'setPoints', 'update', 'render']) {
                     if (methods.includes(method)) {
                         try {
-                            this.heatmapLayer[method]({data: points, max: 1});
-                            console.log(`Used ${method} method`);
+                            this.heatmapLayer[method]({data: formattedPoints});
+                            console.log(`Used ${method} method successfully`);
                             return true;
                         } catch (e) {
                             console.log(`${method} failed:`, e);
@@ -1926,7 +1972,8 @@ class StreetShadeVisualizer {
                 
                 // Try again with the new instance
                 if (this.heatmapLayer && this.heatmapLayer.setDataSet) {
-                    this.heatmapLayer.setDataSet({data: points, max: 1});
+                    this.heatmapLayer.setDataSet({data: formattedPoints});
+                    console.log('Successfully set data with new heatmap instance');
                     return true;
                 }
                 
@@ -1943,10 +1990,11 @@ class StreetShadeVisualizer {
         if (this.heatmapLayer) {
             // Clear data by setting empty dataset
             try {
+                const emptyData = {data: []};
                 if (this.heatmapLayer.setDataSet) {
-                    this.heatmapLayer.setDataSet({data: [], max: 1});
+                    this.heatmapLayer.setDataSet(emptyData);
                 } else if (this.heatmapLayer.setData) {
-                    this.heatmapLayer.setData({data: [], max: 1});
+                    this.heatmapLayer.setData(emptyData);
                 }
             } catch (e) {
                 console.log('Error clearing heatmap:', e);
