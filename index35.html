@@ -1303,12 +1303,20 @@ class StreetShadeVisualizer {
         if (this.initialized) return;
         
         try {
-            const response = await fetch(`${API_BASE_URL}/data-status`);
+            const response = await fetch(`${API_BASE_URL}/api/data-status`);
+            
+            if (!response.ok) {
+                console.log('Street data status check failed:', response.status);
+                this.initialized = true;
+                return false;
+            }
+            
             const data = await response.json();
             
-            if (data.loaded && data.total_segments > 0) {
+            // Check if GeoJSON is already loaded globally
+            if (window.fullGeoJSON) {
                 this.dataLoaded = true;
-                updateStatus(`✅ Auto-loaded ${data.total_segments.toLocaleString()} street segments`);
+                updateStatus(`✅ Street data ready: ${window.fullGeoJSON.features.length.toLocaleString()} segments`);
                 
                 // Wait for AMap.HeatMap to be available
                 await this.waitForHeatMapPlugin();
@@ -1323,14 +1331,12 @@ class StreetShadeVisualizer {
                 setTimeout(() => this.updateBasedOnFilters(), 1500);
                 
                 return true;
-            } else if (data.file_exists) {
-                updateStatus(`⚠️ Data file exists but not loaded. Total segments: ${data.total_segments}`);
             } else {
-                updateStatus('ℹ️ No street data loaded. Please upload GeoJSON file.');
+                updateStatus('⏳ Waiting for street data to load...');
             }
         } catch (error) {
-            console.log('Server not responding:', error.message);
-            updateStatus('❌ Server not available. Make sure server.py is running.', true);
+            console.log('Street visualizer init error:', error.message);
+            // Don't show error - data might still be loading
         }
         
         this.initialized = true;
