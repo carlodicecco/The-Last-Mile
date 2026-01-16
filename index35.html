@@ -253,8 +253,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>Shanghai Metro - Shade Coverage Analysis</h1>
-        <div class="subtitle">Visualizing building shade coverage at metro exits</div>
+        <h1>Shanghai Metro - Heat-Safe Walking Map</h1>
+        <div class="subtitle">Shade based guidance for metro exits and nearby streets</div>
         
         <div class="control-panel">
             <div class="filter-controls">
@@ -439,6 +439,8 @@ let streetData = null;
 let streetHeatmap = null;
 let streetVisualizer = null;
 let currentStreetOpacity = 0.7;
+let heatmapLayer;
+let fullGeoJSON = null;
 
 const API_BASE_URL = 'https://the-last-mile-cfpx.onrender.com';
 
