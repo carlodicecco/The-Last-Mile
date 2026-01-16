@@ -1192,10 +1192,22 @@ async function loadStreetDataOnce() {
         
         // ===== TRIGGER HEATMAP REFRESH IMMEDIATELY AFTER LOADING =====
         if (streetVisualizer) {
-            console.log('🔄 Triggering heatmap refresh with newly loaded GeoJSON');
+            console.log('🔄 Triggering heatmap initialization with newly loaded GeoJSON');
+            
+            // Initialize visualizer if not already done
+            if (!streetVisualizer.heatmapLayer) {
+                console.log('Creating heatmap layer...');
+                await streetVisualizer.waitForHeatMapPlugin();
+                streetVisualizer.createHeatmap();
+                streetVisualizer.setupFilterMonitoring();
+            }
+            
             // Get current time filter value
             const timeFilter = document.getElementById('time-filter');
             const currentTime = timeFilter ? streetVisualizer.formatTimeForAPI(timeFilter.value) : '08:00';
+            
+            // Mark as loaded
+            streetVisualizer.dataLoaded = true;
             
             // Immediately update heatmap with fresh data
             await streetVisualizer.updateHeatmapByTime(currentTime);
