@@ -1572,9 +1572,13 @@ class StreetShadeVisualizer {
         try {
             console.log('Creating AMap.HeatMap instance...');
             
+            // Calculate dynamic radius based on initial zoom
+            const initialZoom = map.getZoom();
+            const dynamicRadius = this.calculateDynamicRadius(initialZoom);
+            
             // Create heatmap
             this.heatmapLayer = new AMap.HeatMap(map, {
-                radius: 25, // Increased radius for better visibility
+                radius: dynamicRadius, // Dynamic radius based on zoom
                 opacity: [0, currentStreetOpacity],
                 gradient: {
                     0.0: 'rgba(0, 0, 255, 0)',      // Blue (low shade)
@@ -1630,6 +1634,13 @@ class StreetShadeVisualizer {
                 this.zoomLevel = newZoom;
                 this.currentBounds = newBounds;
                 this.lastUpdateTime = now;
+                
+                // Update heatmap radius when zoom level changes
+                if (this.heatmapLayer && Math.abs(newZoom - this.zoomLevel) > 0.3) {
+                    const dynamicRadius = this.calculateDynamicRadius(newZoom);
+                    this.heatmapLayer.setOptions({ radius: dynamicRadius });
+                    console.log(`Heatmap radius updated to ${dynamicRadius}px for zoom level ${newZoom}`);
+                }
                 
                 if (this.dataLoaded && this.shouldShowHeatmap()) {
                     this.updateHeatmapByTime(this.currentTime);
@@ -1733,10 +1744,10 @@ class StreetShadeVisualizer {
             
             if (shadeValue === null) return;
             
-            // Only include points with count > 0 for performance
+            // ANTI-SAMPLING: Include ALL points, even with low/zero shade for complete street coverage
             if (shadeValue <= 0) {
                 zeroCount++;
-                return;
+                // Still process zero-shade points for complete street mapping
             }
             
             validCount++;
@@ -1745,33 +1756,37 @@ class StreetShadeVisualizer {
             // GeoJSON format: coordinates are [longitude, latitude]
             const coords = feature.geometry.coordinates;
             coords.forEach(coord => {
-                // Extract lng (index 0) and lat (index 1)
-                const lng = coord[0];
-                const lat = coord[1];
+                // STRICT COORDINATE MAPPING - Explicit indexing
+                // coord[0] = longitude (x), coord[1] = latitude (y)
+                const lng = coord[0];  // Longitude FIRST
+                const lat = coord[1];  // Latitude SECOND
                 
-                // Transform to GCJ-02
+                // Validate coordinates are numbers
+                if (typeof lng !== 'number' || typeof lat !== 'number') {
+                    console.warn('Invalid coordinate pair:', coord);
+                    return;
+                }
+                
+                // Transform from WGS-84 to GCJ-02 for accurate map positioning
                 const [gcjLng, gcjLat] = transformWGS84ToGCJ02(lng, lat);
                 
-                // Create heatmap point with proper data transformation
-                // Normalize shade value: divide by 36 as per requirement
-                heatmapPoints.push({
-                    lat: gcjLat,
-                    lng: gcjLng,
-                    count: shadeValue / 36
-                });
+                // Create heatmap point with CORRECT DATA STRUCTURE
+                // AMap HeatMap expects: {lng: longitude, lat: latitude, count: value}
+                const heatmapPoint = {
+                    lng: gcjLng,        // Longitude (required by AMap)
+                    lat: gcjLat,        // Latitude (required by AMap)
+                    count: Math.max(0, shadeValue / 36)  // Normalize shade value (0-100 -> 0-2.78)
+                };
+                
+                heatmapPoints.push(heatmapPoint);
             });
         });
         
-        console.log(`Extracted ${validCount} features with valid shade data, ${zeroCount} skipped`);
+        console.log(`Extracted ${validCount} features with valid shade data, ${zeroCount} with zero/negative shade`);
         
-        // Limit points if needed
+        // ANTI-SAMPLING: Use ALL points for maximum precision and accurate street-level visualization
         let finalPoints = heatmapPoints;
-        if (heatmapPoints.length > maxPoints) {
-            // Sample points uniformly
-            const step = Math.ceil(heatmapPoints.length / maxPoints);
-            finalPoints = heatmapPoints.filter((_, i) => i % step === 0);
-            console.log(`Sampled ${finalPoints.length} points from ${heatmapPoints.length}`);
-        }
+        console.log(`Using ALL ${finalPoints.length} points for maximum precision (no sampling applied)`);
         
         if (finalPoints.length > 0) {
             // Store for potential re-use
@@ -1917,12 +1932,17 @@ class StreetShadeVisualizer {
     }
     
     calculateMaxPoints(zoom) {
-        // Dynamic point count based on zoom level
-        if (zoom < 12) return 5000;     // Overview
-        if (zoom < 14) return 15000;    // City level
-        if (zoom < 16) return 30000;    // District level
-        if (zoom < 18) return 60000;    // Street level
-        return 100000;                  // Very detailed
+        // NO SAMPLING - return unlimited to show all segments at full precision
+        return Infinity; // Client-side processing shows all points
+    }
+    
+    calculateDynamicRadius(zoom) {
+        // Dynamic radius based on zoom level for optimal visualization
+        if (zoom > 17) return 15;       // Very detailed street level
+        if (zoom > 15) return 12;       // Street level
+        if (zoom > 13) return 8;        // District level
+        if (zoom > 11) return 5;        // City level
+        return 2;                       // Overview level
     }
     
     setHeatmapData(points) {
@@ -1932,14 +1952,22 @@ class StreetShadeVisualizer {
         }
         
         console.log(`Setting ${points.length} points to heatmap`);
-        console.log('Sample point format:', points.length > 0 ? points[0] : 'no points');
+        if (points.length > 0) {
+            console.log('Sample point format:', JSON.stringify(points[0]));
+            console.log('Data structure validation:', 
+                `All have 'lng'? ${points.every(p => typeof p.lng === 'number')}`,
+                `All have 'lat'? ${points.every(p => typeof p.lat === 'number')}`,
+                `All have 'count'? ${points.every(p => typeof p.count === 'number')}`
+            );
+        }
         
         try {
-            // Ensure points are in correct format: {lat, lng, count}
+            // Ensure points are in CORRECT AMap HeatMap format: {lng, lat, count}
+            // AMap HeatMap specifically requires: lng (longitude), lat (latitude), count (intensity value)
             const formattedPoints = points.map(p => ({
-                lat: p.lat,
-                lng: p.lng,
-                count: p.count || 0
+                lng: p.lng,     // Longitude (must be named 'lng' for AMap)
+                lat: p.lat,     // Latitude (must be named 'lat' for AMap)
+                count: typeof p.count === 'number' ? p.count : 0  // Intensity value
             }));
             
             // Try setDataSet first (AMap HeatMap API)
