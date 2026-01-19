@@ -448,6 +448,33 @@ const API_BASE_URL = 'https://the-last-mile-cfpx.onrender.com';
 window.fullGeoJSON = null;
 let isLoadingGeoJSON = false;
 
+// Coordinate system for street GeoJSON: 'gcj02' (AMap native) or 'wgs84'
+// If your street data is already in GCJ-02, leave as 'gcj02' to avoid double shift.
+let STREET_COORD_SYSTEM = 'gcj02';
+
+// Helper: convert feature coords to AMap coords depending on source system
+function toAMapCoords(lng, lat) {
+    if (STREET_COORD_SYSTEM === 'wgs84') {
+        return transformWGS84ToGCJ02(lng, lat);
+    }
+    return [lng, lat];
+}
+
+// Optional: allow runtime toggle from console if needed
+window.setStreetCoordSystem = function(system) {
+    if (system === 'gcj02' || system === 'wgs84') {
+        STREET_COORD_SYSTEM = system;
+        console.log('Street coordinate system set to:', STREET_COORD_SYSTEM);
+        updateStatus('Street coord system: ' + STREET_COORD_SYSTEM);
+        // Refresh current heatmap visualization
+        if (streetVisualizer && streetVisualizer.dataLoaded) {
+            streetVisualizer.updateHeatmapByTime(streetVisualizer.currentTime || '08:00');
+        }
+    } else {
+        console.warn('Invalid coord system. Use "gcj02" or "wgs84"');
+    }
+};
+
 async function loadAndShowFountains() {
     if (!fountainData || fountainData.length === 0) {
         updateStatus('Loading fountain data...');
@@ -1756,8 +1783,8 @@ class StreetShadeVisualizer {
                     return;
                 }
                 
-                // Transform from WGS-84 to GCJ-02 for accurate map positioning
-                const [gcjLng, gcjLat] = transformWGS84ToGCJ02(lng, lat);
+                // Convert to AMap coordinate system (avoid double-transform)
+                const [gcjLng, gcjLat] = toAMapCoords(lng, lat);
                 
                 // Create heatmap point with CORRECT DATA STRUCTURE
                 // AMap HeatMap expects: {lng: longitude, lat: latitude, count: value}
@@ -2575,14 +2602,16 @@ function filterFeaturesByBounds(features, bounds) {
         const coords = feature.geometry.coordinates;
         
         if (feature.geometry.type === 'LineString') {
-            return coords.some(([lng, lat]) => 
-                lng >= sw.lng && lng <= ne.lng &&
-                lat >= sw.lat && lat <= ne.lat
-            );
+            return coords.some(([lng, lat]) => {
+                const [amapLng, amapLat] = toAMapCoords(lng, lat);
+                return amapLng >= sw.lng && amapLng <= ne.lng &&
+                       amapLat >= sw.lat && amapLat <= ne.lat;
+            });
         } else if (feature.geometry.type === 'Point') {
             const [lng, lat] = coords;
-            return lng >= sw.lng && lng <= ne.lng &&
-                   lat >= sw.lat && lat <= ne.lat;
+            const [amapLng, amapLat] = toAMapCoords(lng, lat);
+            return amapLng >= sw.lng && amapLng <= ne.lng &&
+                   amapLat >= sw.lat && amapLat <= ne.lat;
         }
         
         return false;
