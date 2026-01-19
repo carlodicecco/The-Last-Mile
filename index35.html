@@ -1784,9 +1784,16 @@ class StreetShadeVisualizer {
         
         console.log(`Extracted ${validCount} features with valid shade data, ${zeroCount} with zero/negative shade`);
         
-        // ANTI-SAMPLING: Use ALL points for maximum precision and accurate street-level visualization
+        // OPTIMAL SAMPLING: Balance between performance and precision based on zoom level
         let finalPoints = heatmapPoints;
-        console.log(`Using ALL ${finalPoints.length} points for maximum precision (no sampling applied)`);
+        if (heatmapPoints.length > maxPoints) {
+            // Use uniform sampling to maintain spatial distribution
+            const step = Math.ceil(heatmapPoints.length / maxPoints);
+            finalPoints = heatmapPoints.filter((_, i) => i % step === 0);
+            console.log(`Sampled ${finalPoints.length} points from ${heatmapPoints.length} (step=${step}, zoom=${zoom})`);
+        } else {
+            console.log(`Using all ${finalPoints.length} points (within limit for zoom ${zoom})`);
+        }
         
         if (finalPoints.length > 0) {
             // Store for potential re-use
@@ -1932,8 +1939,15 @@ class StreetShadeVisualizer {
     }
     
     calculateMaxPoints(zoom) {
-        // NO SAMPLING - return unlimited to show all segments at full precision
-        return Infinity; // Client-side processing shows all points
+        // Optimal sampling: aggressive when zoomed out, precise when zoomed in
+        if (zoom < 11) return 2000;      // Very zoomed out - minimal points
+        if (zoom < 12) return 5000;      // Zoomed out - light sampling
+        if (zoom < 13) return 10000;     // City overview
+        if (zoom < 14) return 20000;     // City level
+        if (zoom < 15) return 40000;     // District level
+        if (zoom < 16) return 80000;     // Street overview
+        if (zoom < 17) return 150000;    // Street level
+        return 300000;                   // Maximum precision at highest zoom
     }
     
     calculateDynamicRadius(zoom) {
